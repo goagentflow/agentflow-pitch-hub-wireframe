@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { NavLink } from "./NavLink";
-import { Home, FileText, Play, FolderOpen, MessageSquare, Calendar } from "lucide-react";
+import { Home, FileText, Play, FolderOpen, MessageSquare, Calendar, ClipboardList, Users } from "lucide-react";
 
 interface ClientHubLayoutProps {
   children: React.ReactNode;
@@ -32,6 +32,8 @@ const clientNavItems = [
   { title: "Documents", url: "/portal/documents", icon: FolderOpen, badge: "5" },
   { title: "Messages", url: "/portal/messages", icon: MessageSquare, badge: "2" },
   { title: "Meetings", url: "/portal/meetings", icon: Calendar },
+  { title: "Questionnaire", url: "/portal/questionnaire", icon: ClipboardList, badge: "1" },
+  { title: "People", url: "/portal/people", icon: Users },
 ];
 
 function ClientSidebar() {
