@@ -1,10 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
+  const navigate = useNavigate();
+
   const handleSignIn = () => {
-    // Placeholder for Microsoft sign-in - no actual functionality
+    // Placeholder for Microsoft sign-in - navigate to hubs page
     console.log("Sign in button clicked (placeholder)");
+    navigate("/hubs");
   };
 
   return (
