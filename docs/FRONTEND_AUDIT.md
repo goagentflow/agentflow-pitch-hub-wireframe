@@ -2,6 +2,53 @@
 
 **Phase 1 Complete** - Comprehensive audit of current state, identifying what works, what's placeholder, and what Stephen needs to build in the middleware.
 
+**Revision 1** - Updated per senior dev review: hub-scoped endpoints, pagination standards, event enums, licensing caveats.
+
+---
+
+## 0. API Conventions
+
+### Base URL & Versioning
+
+All endpoints use `/api/v1/` prefix:
+```
+https://api.agentflow.com/api/v1/hubs/{hubId}/...
+```
+
+### Pagination, Sorting, Filtering
+
+All list endpoints support these query parameters:
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `page` | number | Page number (1-indexed) | `?page=2` |
+| `pageSize` | number | Items per page (default 20, max 100) | `?pageSize=50` |
+| `sort` | string | Sort field and direction | `?sort=createdAt:desc` |
+| `filter` | string | Filter expression | `?filter=status:active` |
+| `search` | string | Full-text search | `?search=proposal` |
+
+### Common Error Responses
+
+All endpoints return errors in this format:
+
+```typescript
+interface ApiError {
+  code: string;
+  message: string;
+  details?: Record<string, any>;
+}
+```
+
+| Status | Code | When |
+|--------|------|------|
+| 401 | `UNAUTHENTICATED` | No valid token |
+| 403 | `FORBIDDEN` | User lacks permission for this hub/resource |
+| 404 | `NOT_FOUND` | Hub or resource doesn't exist |
+| 409 | `CONFLICT` | Resource already exists (e.g., duplicate invite) |
+| 413 | `PAYLOAD_TOO_LARGE` | File exceeds size limit |
+| 429 | `RATE_LIMITED` | Too many requests |
+| 5xx | `INTERNAL_ERROR` | Server error |
+
 ---
 
 ## 1. Authentication & Routing
@@ -56,8 +103,8 @@ if (email === "sarah@neverlandcreative.com" && password === "password123") {
    - `RequireHubAccess` - Verify user has access to specific hub
 
 3. **API Endpoints Required**:
-   - `GET /api/auth/me` - Return current user profile and role
-   - `GET /api/hubs/:hubId/access` - Check user's access level for a hub
+   - `GET /api/v1/auth/me` - Return current user profile and role
+   - `GET /api/v1/hubs/:hubId/access` - Check user's access level for a hub
 
 ---
 
@@ -85,14 +132,14 @@ if (email === "sarah@neverlandcreative.com" && password === "password123") {
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/hubs/:hubId/invites` | POST | Invite a guest to a hub |
-| `/api/hubs/:hubId/invites` | GET | List pending invites |
-| `/api/hubs/:hubId/invites/:id` | DELETE | Revoke invite |
-| `/api/hubs/:hubId/members` | GET | List members with access |
-| `/api/hubs/:hubId/members/:id` | PATCH | Update access level |
-| `/api/hubs/:hubId/members/:id` | DELETE | Remove member access |
-| `/api/hubs/:hubId/share-link` | POST | Generate shareable link |
-| `/api/invites/:token/accept` | POST | Accept invite via token |
+| `/api/v1/hubs/:hubId/invites` | POST | Invite a guest to a hub |
+| `/api/v1/hubs/:hubId/invites` | GET | List pending invites |
+| `/api/v1/hubs/:hubId/invites/:id` | DELETE | Revoke invite |
+| `/api/v1/hubs/:hubId/members` | GET | List members with access |
+| `/api/v1/hubs/:hubId/members/:id` | PATCH | Update access level |
+| `/api/v1/hubs/:hubId/members/:id` | DELETE | Remove member access |
+| `/api/v1/hubs/:hubId/share-link` | POST | Generate shareable link |
+| `/api/v1/invites/:token/accept` | POST | Accept invite via token |
 
 ### Domain Restriction Logic
 
@@ -134,8 +181,8 @@ const mockHubs = [
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/hubs` | GET | List hubs (with search/filter params) |
-| `/api/hubs` | POST | Create new hub |
+| `/api/v1/hubs` | GET | List hubs (supports `?page`, `?pageSize`, `?sort`, `?filter`, `?search`) |
+| `/api/v1/hubs` | POST | Create new hub |
 
 ### Hub Object Schema (for Stephen)
 
@@ -150,6 +197,16 @@ interface Hub {
   lastActivity: string;
   clientsInvited: number;
   lastVisit?: string;
+}
+
+interface HubListResponse {
+  data: Hub[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
 }
 ```
 
@@ -170,11 +227,11 @@ interface Hub {
 | "See what Sarah sees" | **Placeholder** | No navigation |
 
 **API Required**:
-- `GET /api/hubs/:hubId` - Hub details
-- `GET /api/hubs/:hubId/activity` - Activity feed
-- `GET /api/hubs/:hubId/alerts` - Action items/alerts
-- `GET /api/hubs/:hubId/engagement` - Engagement statistics
-- `PATCH /api/hubs/:hubId/notes` - Update internal notes
+- `GET /api/v1/hubs/:hubId` - Hub details
+- `GET /api/v1/hubs/:hubId/activity` - Activity feed (supports pagination)
+- `GET /api/v1/hubs/:hubId/alerts` - Action items/alerts
+- `GET /api/v1/hubs/:hubId/engagement` - Engagement statistics
+- `PATCH /api/v1/hubs/:hubId/notes` - Update internal notes
 
 ### 4.2 Client Portal (ClientPortalSection.tsx)
 
@@ -190,9 +247,9 @@ interface Hub {
 | Preview as client | **Placeholder** | Button with no handler |
 
 **API Required**:
-- `GET /api/hubs/:hubId/portal-config` - Portal settings
-- `PATCH /api/hubs/:hubId/portal-config` - Update settings
-- `POST /api/hubs/:hubId/publish` - Publish portal
+- `GET /api/v1/hubs/:hubId/portal-config` - Portal settings
+- `PATCH /api/v1/hubs/:hubId/portal-config` - Update settings
+- `POST /api/v1/hubs/:hubId/publish` - Publish portal
 
 ### 4.3 Proposal (ProposalSection.tsx)
 
@@ -209,11 +266,11 @@ interface Hub {
 | Version history | **Placeholder** | Static versions |
 
 **API Required**:
-- `GET /api/hubs/:hubId/proposal` - Proposal metadata + presigned URL
-- `POST /api/hubs/:hubId/proposal` - Upload new proposal (chunked)
-- `DELETE /api/hubs/:hubId/proposal` - Delete proposal
-- `GET /api/hubs/:hubId/proposal/engagement` - View analytics
-- `PATCH /api/hubs/:hubId/proposal/settings` - Visibility/download settings
+- `GET /api/v1/hubs/:hubId/proposal` - Proposal metadata + presigned URL
+- `POST /api/v1/hubs/:hubId/proposal` - Upload new proposal (chunked/resumable)
+- `DELETE /api/v1/hubs/:hubId/proposal` - Delete proposal
+- `GET /api/v1/hubs/:hubId/proposal/engagement` - View analytics
+- `PATCH /api/v1/hubs/:hubId/proposal/settings` - Visibility/download settings
 
 ### 4.4 Videos (VideosSection.tsx)
 
@@ -229,12 +286,12 @@ interface Hub {
 | View counts | **Placeholder** | Static data |
 
 **API Required**:
-- `GET /api/hubs/:hubId/videos` - List videos
-- `POST /api/hubs/:hubId/videos` - Upload video (chunked)
-- `POST /api/hubs/:hubId/videos/link` - Add external video link
-- `PATCH /api/hubs/:hubId/videos/:id` - Update video metadata
-- `DELETE /api/hubs/:hubId/videos/:id` - Delete video
-- `GET /api/hubs/:hubId/videos/:id/engagement` - View analytics
+- `GET /api/v1/hubs/:hubId/videos` - List videos (supports pagination)
+- `POST /api/v1/hubs/:hubId/videos` - Upload video (chunked/resumable)
+- `POST /api/v1/hubs/:hubId/videos/link` - Add external video link
+- `PATCH /api/v1/hubs/:hubId/videos/:id` - Update video metadata
+- `DELETE /api/v1/hubs/:hubId/videos/:id` - Delete video
+- `GET /api/v1/hubs/:hubId/videos/:id/engagement` - View analytics
 
 ### 4.5 Documents (DocumentsSection.tsx)
 
@@ -251,11 +308,11 @@ interface Hub {
 | Bulk actions | **Placeholder** | Bar appears, actions no-op |
 
 **API Required**:
-- `GET /api/hubs/:hubId/documents` - List documents (with visibility filter)
-- `POST /api/hubs/:hubId/documents` - Upload document (chunked)
-- `PATCH /api/hubs/:hubId/documents/:id` - Update metadata/visibility
-- `DELETE /api/hubs/:hubId/documents/:id` - Delete document
-- `GET /api/hubs/:hubId/documents/:id/engagement` - View analytics
+- `GET /api/v1/hubs/:hubId/documents` - List documents (supports `?visibility=client|internal`, pagination)
+- `POST /api/v1/hubs/:hubId/documents` - Upload document (chunked/resumable)
+- `PATCH /api/v1/hubs/:hubId/documents/:id` - Update metadata/visibility
+- `DELETE /api/v1/hubs/:hubId/documents/:id` - Delete document
+- `GET /api/v1/hubs/:hubId/documents/:id/engagement` - View analytics
 
 ### 4.6 Messages (MessagesSection.tsx)
 
@@ -270,11 +327,18 @@ interface Hub {
 | Search | **Placeholder** | Input renders, no filtering |
 | Archive | **Placeholder** | Button exists, no handler |
 
+#### Hub-to-Email Scoping Model
+
+Messages are scoped to a hub using **email category labels**. The middleware:
+1. Adds a category label `AgentFlow-Hub:{hubId}` to all emails sent via the hub
+2. Filters inbox/sent by this category when fetching threads
+3. This allows per-hub message isolation without separate mailboxes
+
 **API Required**:
-- `GET /api/hubs/:hubId/messages` - List email threads (via OBO to Graph)
-- `POST /api/hubs/:hubId/messages` - Send message (via OBO to Graph)
-- `GET /api/hubs/:hubId/messages/:threadId` - Get thread messages
-- `PATCH /api/hubs/:hubId/messages/:threadId/notes` - Update team notes
+- `GET /api/v1/hubs/:hubId/messages` - List email threads (via OBO to Graph, filtered by category)
+- `POST /api/v1/hubs/:hubId/messages` - Send message (via OBO to Graph, applies category)
+- `GET /api/v1/hubs/:hubId/messages/:threadId` - Get thread messages
+- `PATCH /api/v1/hubs/:hubId/messages/:threadId/notes` - Update team notes (stored in backend, not Graph)
 
 ### 4.7 Meetings (MeetingsSection.tsx)
 
@@ -290,13 +354,20 @@ interface Hub {
 | AI summary | **Placeholder** | Static summary |
 | Meeting notes | **Placeholder** | Textarea, no persistence |
 
+#### Licensing Caveat
+
+> **Note**: Meeting recordings and transcripts require **Teams Premium** licensing. The middleware should:
+> - Check if recording/transcript is available before returning URLs
+> - Return `null` gracefully if unavailable
+> - UI should show "Recording not available" rather than error
+
 **API Required**:
-- `GET /api/hubs/:hubId/meetings` - List meetings (via OBO to Graph Calendar)
-- `POST /api/hubs/:hubId/meetings` - Schedule meeting (via OBO)
-- `PATCH /api/hubs/:hubId/meetings/:id/agenda` - Update agenda
-- `PATCH /api/hubs/:hubId/meetings/:id/notes` - Update team notes
-- `GET /api/hubs/:hubId/meetings/:id/recording` - Get recording URL
-- `GET /api/hubs/:hubId/meetings/:id/transcript` - Get transcript
+- `GET /api/v1/hubs/:hubId/meetings` - List meetings (via OBO to Graph Calendar, supports pagination)
+- `POST /api/v1/hubs/:hubId/meetings` - Schedule meeting (via OBO)
+- `PATCH /api/v1/hubs/:hubId/meetings/:id/agenda` - Update agenda
+- `PATCH /api/v1/hubs/:hubId/meetings/:id/notes` - Update team notes
+- `GET /api/v1/hubs/:hubId/meetings/:id/recording` - Get recording URL (best effort, may return null)
+- `GET /api/v1/hubs/:hubId/meetings/:id/transcript` - Get transcript (best effort, may return null)
 
 ### 4.8 Questionnaire (QuestionnaireSection.tsx)
 
@@ -309,16 +380,26 @@ interface Hub {
 | Share questionnaire | **Placeholder** | Copy link, email send |
 | QR code | **Placeholder** | Icon placeholder |
 
+#### Microsoft Forms API Limitations
+
+> **Note**: Microsoft Forms API has limited response retrieval capabilities. For v0.1:
+> - Link questionnaire by URL
+> - Track completion status (completed/not completed per user)
+> - Detailed response analytics are **optional/best-effort**
+> - Consider embedding the form directly rather than pulling data
+
 **API Required**:
-- `GET /api/hubs/:hubId/questionnaires` - List linked questionnaires
-- `POST /api/hubs/:hubId/questionnaires` - Link Microsoft Forms questionnaire
-- `GET /api/hubs/:hubId/questionnaires/:id` - Get questionnaire details
-- `GET /api/hubs/:hubId/questionnaires/:id/responses` - Fetch responses (via Graph)
-- `DELETE /api/hubs/:hubId/questionnaires/:id` - Unlink questionnaire
+- `GET /api/v1/hubs/:hubId/questionnaires` - List linked questionnaires
+- `POST /api/v1/hubs/:hubId/questionnaires` - Link Microsoft Forms questionnaire
+- `GET /api/v1/hubs/:hubId/questionnaires/:id` - Get questionnaire details + completion status
+- `GET /api/v1/hubs/:hubId/questionnaires/:id/responses` - Fetch responses (**optional**, via Graph, may be limited)
+- `DELETE /api/v1/hubs/:hubId/questionnaires/:id` - Unlink questionnaire
 
 ---
 
 ## 5. Client View Sections
+
+**Important**: All client portal endpoints are hub-scoped to avoid ambiguity when a user has access to multiple hubs.
 
 ### 5.1 Client Overview (ClientOverviewSection.tsx)
 
@@ -332,8 +413,8 @@ interface Hub {
 | "Getting Started" CTA | **Working** | Opens modal |
 
 **API Required**:
-- `GET /api/portal/config` - Portal welcome config
-- `GET /api/portal/activity` - Recent activity feed
+- `GET /api/v1/hubs/:hubId/portal/config` - Portal welcome config
+- `GET /api/v1/hubs/:hubId/portal/activity` - Recent activity feed
 
 ### 5.2 Client Proposal (ClientProposalSection.tsx)
 
@@ -348,35 +429,35 @@ interface Hub {
 | Sidebar info | **Placeholder** | Static data |
 
 **API Required**:
-- `GET /api/portal/proposal` - Get proposal for viewing
-- `POST /api/portal/proposal/comment` - Submit comment (creates message thread)
-- `POST /api/portal/share` - Share with colleague (domain-restricted)
+- `GET /api/v1/hubs/:hubId/portal/proposal` - Get proposal for viewing
+- `POST /api/v1/hubs/:hubId/portal/proposal/comment` - Submit comment (creates message thread with SlideRef)
+- `POST /api/v1/hubs/:hubId/portal/share` - Share with colleague (domain-restricted)
 
-### 5.3 Client Videos (assumed similar pattern)
-
-**API Required**:
-- `GET /api/portal/videos` - List visible videos
-
-### 5.4 Client Documents (assumed similar pattern)
+### 5.3 Client Videos
 
 **API Required**:
-- `GET /api/portal/documents` - List visible documents
+- `GET /api/v1/hubs/:hubId/portal/videos` - List visible videos
 
-### 5.5 Client Messages (assumed similar pattern)
-
-**API Required**:
-- `GET /api/portal/messages` - List messages
-- `POST /api/portal/messages` - Send message
-
-### 5.6 Client Meetings (assumed similar pattern)
+### 5.4 Client Documents
 
 **API Required**:
-- `GET /api/portal/meetings` - List upcoming meetings
+- `GET /api/v1/hubs/:hubId/portal/documents` - List visible documents
 
-### 5.7 Client Questionnaire (assumed similar pattern)
+### 5.5 Client Messages
 
 **API Required**:
-- `GET /api/portal/questionnaires` - List questionnaires to complete
+- `GET /api/v1/hubs/:hubId/portal/messages` - List messages
+- `POST /api/v1/hubs/:hubId/portal/messages` - Send message
+
+### 5.6 Client Meetings
+
+**API Required**:
+- `GET /api/v1/hubs/:hubId/portal/meetings` - List upcoming meetings
+
+### 5.7 Client Questionnaire
+
+**API Required**:
+- `GET /api/v1/hubs/:hubId/portal/questionnaires` - List questionnaires to complete
 
 ### 5.8 Client People (ClientPeopleSection.tsx)
 
@@ -390,10 +471,10 @@ interface Hub {
 | Recent activity | **Placeholder** | Static recentActivity |
 
 **API Required**:
-- `GET /api/portal/members` - List hub members
-- `POST /api/portal/invite` - Invite colleague (domain-restricted)
-- `PATCH /api/portal/members/:id` - Update access level
-- `DELETE /api/portal/members/:id` - Remove access
+- `GET /api/v1/hubs/:hubId/portal/members` - List hub members
+- `POST /api/v1/hubs/:hubId/portal/invite` - Invite colleague (domain-restricted)
+- `PATCH /api/v1/hubs/:hubId/portal/members/:id` - Update access level
+- `DELETE /api/v1/hubs/:hubId/portal/members/:id` - Remove access
 
 ---
 
@@ -435,35 +516,59 @@ interface Hub {
 
 ## 7. Engagement Tracking
 
+### Event Type Enum
+
+All events use a strict enum type to prevent typos and enable reliable analytics:
+
+```typescript
+enum EventType {
+  HUB_VIEWED = "hub.viewed",
+  PROPOSAL_VIEWED = "proposal.viewed",
+  PROPOSAL_SLIDE_TIME = "proposal.slide_time",
+  VIDEO_WATCHED = "video.watched",
+  VIDEO_COMPLETED = "video.completed",
+  DOCUMENT_VIEWED = "document.viewed",
+  DOCUMENT_DOWNLOADED = "document.downloaded",
+  MEETING_JOINED = "meeting.joined",
+  MESSAGE_SENT = "message.sent",
+  MESSAGE_READ = "message.read",
+  QUESTIONNAIRE_STARTED = "questionnaire.started",
+  QUESTIONNAIRE_COMPLETED = "questionnaire.completed",
+  SHARE_SENT = "share.sent",
+  SHARE_ACCEPTED = "share.accepted",
+}
+```
+
 ### Events to Track
 
-| Event | Location | Data |
-|-------|----------|------|
-| `hub.viewed` | Hub sections | hubId, userId, section |
-| `proposal.viewed` | ProposalSection | hubId, userId, slideNum |
-| `proposal.slide_time` | ProposalSection | hubId, slideNum, seconds |
-| `video.watched` | VideosSection | hubId, videoId, watchTime |
-| `document.downloaded` | DocumentsSection | hubId, documentId |
-| `document.viewed` | DocumentsSection | hubId, documentId |
-| `meeting.joined` | MeetingsSection | hubId, meetingId |
-| `message.sent` | MessagesSection | hubId, threadId |
-| `questionnaire.completed` | QuestionnaireSection | hubId, questionnaireId |
-| `share.sent` | Various | hubId, recipientEmail |
+| Event | Location | Metadata |
+|-------|----------|----------|
+| `hub.viewed` | Hub sections | `{ section: string }` |
+| `proposal.viewed` | ProposalSection | `{ slideNum: number }` |
+| `proposal.slide_time` | ProposalSection | `{ slideNum: number, seconds: number }` |
+| `video.watched` | VideosSection | `{ videoId: string, watchTime: number, percentComplete: number }` |
+| `video.completed` | VideosSection | `{ videoId: string }` |
+| `document.viewed` | DocumentsSection | `{ documentId: string }` |
+| `document.downloaded` | DocumentsSection | `{ documentId: string }` |
+| `meeting.joined` | MeetingsSection | `{ meetingId: string }` |
+| `message.sent` | MessagesSection | `{ threadId: string }` |
+| `questionnaire.completed` | QuestionnaireSection | `{ questionnaireId: string }` |
+| `share.sent` | Various | `{ recipientEmail: string, resourceType: string }` |
 
-### Normalized Schema
+### Event Schema
 
 ```typescript
 interface ActivityEvent {
-  eventType: string;
+  eventType: EventType;  // Enum, not free-text string
   hubId: string;
   userId: string;
-  timestamp: string;
+  timestamp: string;     // ISO 8601
   metadata: Record<string, any>;
 }
 ```
 
 **API Required**:
-- `POST /api/events` - Log engagement event
+- `POST /api/v1/hubs/:hubId/events` - Log engagement event (hub-scoped)
 
 ---
 
@@ -504,7 +609,7 @@ interface ActivityEvent {
 ## 9. Next Steps
 
 **Phase 2 will create**:
-1. `src/types/*.ts` - TypeScript interfaces for all data
+1. `src/types/*.ts` - TypeScript interfaces for all data (including EventType enum)
 2. `src/services/*.ts` - API service layer with mock implementations
 3. `src/hooks/*.ts` - React Query hooks for data fetching
 4. `src/routes/guards.tsx` - Protected route components

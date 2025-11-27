@@ -33,6 +33,30 @@ User → MSAL (get backend token) → Front-end → Backend API → OBO → Micr
 - Domain-restricted sharing (clients can only share within their email domain)
 - Permission levels: Full Access, Proposal Only, Documents Only, specific items
 
+### API Conventions
+
+**Versioning**: All endpoints use `/api/v1/` prefix.
+
+**Hub-Scoped Endpoints**: All data operations include hubId in the path:
+- Staff: `/api/v1/hubs/{hubId}/...`
+- Client Portal: `/api/v1/hubs/{hubId}/portal/...`
+
+**Pagination**: All list endpoints support `?page`, `?pageSize`, `?sort`, `?filter`, `?search`.
+
+**Common Error Responses**:
+
+| Status | Code | When |
+|--------|------|------|
+| 401 | `UNAUTHENTICATED` | No valid token |
+| 403 | `FORBIDDEN` | User lacks permission |
+| 404 | `NOT_FOUND` | Resource doesn't exist |
+| 409 | `CONFLICT` | Duplicate resource |
+| 413 | `PAYLOAD_TOO_LARGE` | File exceeds limit |
+| 429 | `RATE_LIMITED` | Too many requests |
+| 5xx | `INTERNAL_ERROR` | Server error |
+
+**Event Tracking**: Uses enum types (not free-text strings) for reliable analytics.
+
 ---
 
 ## Phase 1: Audit & Document
@@ -125,6 +149,16 @@ For each of: Overview, Proposal, Videos, Documents, Messages, Meetings, Question
 
 ### Deliverable
 `docs/API_SPECIFICATION.md` — The contract between front-end and middleware
+
+### Key Requirements
+- All endpoints versioned with `/api/v1/` prefix
+- All data endpoints hub-scoped (`/api/v1/hubs/{hubId}/...`)
+- Client portal endpoints under `/api/v1/hubs/{hubId}/portal/...`
+- Event types defined as enum (not free-text strings)
+- Pagination/sort/filter params documented for all list endpoints
+- Common error shape documented
+- Licensing caveats noted (Teams Premium for recordings/transcripts)
+- Microsoft Forms API limitations acknowledged
 
 ---
 
