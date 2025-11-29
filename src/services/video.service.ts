@@ -12,6 +12,7 @@ import type {
   PaginatedList,
   PaginationParams,
   BulkVideoActionRequest,
+  VideoFilterParams,
 } from "@/types";
 import { api, isMockApiEnabled, simulateDelay } from "./api";
 import { mockVideos } from "./mock-data";
@@ -21,12 +22,27 @@ import { mockVideos } from "./mock-data";
  */
 export async function getVideos(
   hubId: string,
-  params?: PaginationParams
+  params?: PaginationParams & VideoFilterParams
 ): Promise<PaginatedList<Video>> {
   if (isMockApiEnabled()) {
     await simulateDelay(300);
 
-    const filtered = mockVideos.filter((v) => v.hubId === hubId);
+    let filtered = mockVideos.filter((v) => v.hubId === hubId);
+
+    // Apply projectId filter
+    if (params?.projectId) {
+      if (params.projectId === "unassigned") {
+        filtered = filtered.filter((v) => !v.projectId);
+      } else {
+        filtered = filtered.filter((v) => v.projectId === params.projectId);
+      }
+    }
+
+    // Apply visibility filter
+    if (params?.visibility) {
+      filtered = filtered.filter((v) => v.visibility === params.visibility);
+    }
+
     const page = params?.page || 1;
     const pageSize = params?.pageSize || 20;
 
@@ -44,6 +60,8 @@ export async function getVideos(
   const queryParams: Record<string, string> = {};
   if (params?.page) queryParams.page = String(params.page);
   if (params?.pageSize) queryParams.pageSize = String(params.pageSize);
+  if (params?.projectId) queryParams.projectId = params.projectId;
+  if (params?.visibility) queryParams.visibility = params.visibility;
 
   return api.get<PaginatedList<Video>>(`/hubs/${hubId}/videos`, queryParams);
 }

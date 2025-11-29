@@ -28,6 +28,15 @@ export async function getMeetings(
 
     let filtered = mockMeetings.filter((m) => m.hubId === hubId);
 
+    // Apply projectId filter
+    if (params?.projectId) {
+      if (params.projectId === "unassigned") {
+        filtered = filtered.filter((m) => !m.projectId);
+      } else {
+        filtered = filtered.filter((m) => m.projectId === params.projectId);
+      }
+    }
+
     if (params?.status) {
       filtered = filtered.filter((m) => m.status === params.status);
     }
@@ -51,6 +60,7 @@ export async function getMeetings(
 
   const queryParams: Record<string, string> = {};
   if (params?.page) queryParams.page = String(params.page);
+  if (params?.projectId) queryParams.projectId = params.projectId;
   if (params?.status) queryParams.status = params.status;
   if (params?.fromDate) queryParams.fromDate = params.fromDate;
   if (params?.toDate) queryParams.toDate = params.toDate;

@@ -28,7 +28,10 @@ export {
   getPortalConfig,
   updatePortalConfig,
   publishPortal,
+  convertToClientHub,
+  rollbackConversion,
 } from "./hub.service";
+export type { ConvertHubResponse, ConvertHubRequest } from "./hub.service";
 
 // Proposal service
 export {
@@ -124,3 +127,52 @@ export {
   getSessionEvents,
   clearSessionEvents,
 } from "./activity.service";
+
+// ============================================================================
+// Phase 2: Client Hub Services
+// ============================================================================
+
+// Project service
+export {
+  getProjects,
+  getProject,
+  createProject,
+  updateProject,
+  deleteProject,
+  createMilestone,
+  updateMilestone,
+  deleteMilestone,
+} from "./project.service";
+
+// Client Intelligence service
+export {
+  createInstantAnswer,
+  getInstantAnswer,
+  getRecentInstantAnswers,
+  getDecisions,
+  getDecision,
+  createDecision,
+  updateDecision,
+  generateMeetingPrep,
+  getMeetingPrep,
+  generateMeetingFollowUp,
+  getMeetingFollowUp,
+  generatePerformanceNarrative,
+  getPerformanceNarrative,
+  getLatestPerformanceNarrative,
+  getHistoryEvents,
+  getRiskAlerts,
+  acknowledgeRiskAlert,
+} from "./client-intelligence.service";
+
+// Relationship Intelligence service
+export {
+  getRelationshipHealth,
+  getExpansionOpportunities,
+  updateExpansionOpportunity,
+  getPortfolioOverview,
+  getPortfolioClients,
+  getAtRiskClients,
+  getExpansionCandidates,
+  refreshPortfolioMetrics,
+} from "./relationship-intelligence.service";

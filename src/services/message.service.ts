@@ -59,6 +59,15 @@ export async function getMessageThreads(
 
     let filtered = mockMessageThreads.filter((t) => t.hubId === hubId);
 
+    // Apply projectId filter
+    if (params?.projectId) {
+      if (params.projectId === "unassigned") {
+        filtered = filtered.filter((t) => !t.projectId);
+      } else {
+        filtered = filtered.filter((t) => t.projectId === params.projectId);
+      }
+    }
+
     if (params?.isArchived !== undefined) {
       filtered = filtered.filter((t) => t.isArchived === params.isArchived);
     }
@@ -79,6 +88,7 @@ export async function getMessageThreads(
 
   const queryParams: Record<string, string> = {};
   if (params?.page) queryParams.page = String(params.page);
+  if (params?.projectId) queryParams.projectId = params.projectId;
   if (params?.isArchived !== undefined) queryParams.isArchived = String(params.isArchived);
   if (params?.isRead !== undefined) queryParams.isRead = String(params.isRead);
 

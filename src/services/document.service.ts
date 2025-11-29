@@ -30,6 +30,15 @@ export async function getDocuments(
 
     let filtered = mockDocuments.filter((d) => d.hubId === hubId);
 
+    // Apply projectId filter
+    if (params?.projectId) {
+      if (params.projectId === "unassigned") {
+        filtered = filtered.filter((d) => !d.projectId);
+      } else {
+        filtered = filtered.filter((d) => d.projectId === params.projectId);
+      }
+    }
+
     // Apply visibility filter
     if (params?.visibility) {
       filtered = filtered.filter((d) => d.visibility === params.visibility);
@@ -67,6 +76,7 @@ export async function getDocuments(
   const queryParams: Record<string, string> = {};
   if (params?.page) queryParams.page = String(params.page);
   if (params?.pageSize) queryParams.pageSize = String(params.pageSize);
+  if (params?.projectId) queryParams.projectId = params.projectId;
   if (params?.visibility) queryParams.visibility = params.visibility;
   if (params?.category) queryParams.category = params.category;
   if (params?.search) queryParams.search = params.search;
