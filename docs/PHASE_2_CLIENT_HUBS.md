@@ -1,9 +1,9 @@
 # Phase 2: Client Hub Expansion
 
-**Document Version:** 1.2
+**Document Version:** 1.3
 **Last Updated:** November 2025
 **Status:** Planning Complete — Ready for Implementation
-**Revision:** Final review — added async job flows, Decision Queue schema, Project associations, RBAC, conversion atomicity, PII contract
+**Revision:** Final polish — added 409 responses, async job SLA fields, filter semantics, freshness metadata, explicit evidence rules, audit fields
 
 ---
 
@@ -376,14 +376,19 @@ POST   /hubs/{hubId}/convert
        — MUST be idempotent: calling twice returns same result, no side effects
        — Request: { initialProjectName?: string }
        — Response: {
-           hub: Hub,
+           hub: Hub, // Includes convertedAt, convertedBy audit fields
            archiveSummary: {
              proposalArchived: boolean,
              proposalDocumentId?: string, // ID of archived proposal in Documents
              questionnaireArchived: boolean,
              questionnaireHistoryId?: string // ID of questionnaire in History
            },
-           project?: Project // If initialProjectName was provided
+           project?: Project, // If initialProjectName was provided
+           alreadyConverted: boolean,
+           audit: {
+             convertedBy: string, // User ID who performed conversion
+             convertedAt: string // ISO timestamp
+           }
          }
 ```
 
@@ -409,13 +414,24 @@ POST   /hubs/{hubId}/convert/rollback
 
 ```
 GET    /hubs/{hubId}/relationship-health
-       — Response: { score: 0-100, status, trend, drivers: [{ type, weight, excerpt?, timestamp }], lastCalculated }
+       — Response: {
+           score: 0-100,
+           status: "strong" | "stable" | "at_risk",
+           trend: "improving" | "stable" | "declining",
+           drivers: [{ type, weight, excerpt?, timestamp }],
+           lastCalculatedAt: string, // When score was computed
+           lastRefreshedAt: string // When source data was fetched
+         }
 
 GET    /hubs/{hubId}/expansion-opportunities
-       — Response: { opportunities: [{ id, title, evidence[], confidence, status }] }
+       — Response: {
+           opportunities: [{ id, title, evidence[], confidence, status }],
+           lastCalculatedAt: string
+         }
 
 PATCH  /hubs/{hubId}/expansion-opportunities/{id}
        — Request: { status: "open"|"in_progress"|"won"|"lost", notes?: string }
+       — Response includes audit fields: { updatedBy, updatedAt }
 ```
 
 ### Projects
@@ -449,6 +465,11 @@ GET    /hubs/{hubId}/messages?projectId={projectId}
 GET    /hubs/{hubId}/meetings?projectId={projectId}
 ```
 
+**Filter Semantics:**
+- No `projectId` param → Returns ALL artifacts (assigned + unassigned)
+- `projectId={id}` → Returns only artifacts assigned to that project
+- `projectId=null` or `projectId=unassigned` → Returns only UNASSIGNED artifacts (projectId is null/undefined)
+
 **Assigning artifacts to projects:**
 ```
 PATCH  /hubs/{hubId}/documents/{docId}         — { projectId?: string }
@@ -463,11 +484,22 @@ All AI-powered endpoints use a consistent async job pattern:
 
 **Pattern: POST creates job → GET polls for result**
 
+**Job SLA Fields (included in all async responses):**
+- `expiresAt`: ISO timestamp when job will be garbage collected (default: createdAt + 1 hour)
+- `pollIntervalHint`: Suggested polling interval in milliseconds (default: 2000)
+- `retryAfter`: If rate-limited, seconds to wait before retrying
+
 #### Instant Answers
 ```
 POST   /hubs/{hubId}/instant-answer/requests
        — Request: { question: string }
-       — Response: { answerId: string, status: "queued", createdAt: string }
+       — Response: {
+           answerId: string,
+           status: "queued",
+           createdAt: string,
+           expiresAt: string, // Job TTL
+           pollIntervalHint: 2000 // Suggested poll interval (ms)
+         }
 
 GET    /hubs/{hubId}/instant-answer/{answerId}
        — Response: {
@@ -479,11 +511,16 @@ GET    /hubs/{hubId}/instant-answer/{answerId}
            confidence?: "high" | "medium" | "low",
            evidence?: Evidence[], // PII-scrubbed excerpts
            createdAt: string,
+           expiresAt: string,
            completedAt?: string,
            error?: string // Only if status="error"
          }
-       — UI polls every 2s until status="ready" or "error"
+       — Poll using pollIntervalHint until status="ready" or "error"
        — Show "preparing..." state while status="queued"
+
+DELETE /hubs/{hubId}/instant-answer/{answerId}
+       — Cancel a queued job (optional, returns 404 if already completed)
+       — Response: { cancelled: boolean }
 
 GET    /hubs/{hubId}/instant-answer/latest
        — Returns most recent answers for this hub (cached, max 10)
@@ -548,6 +585,13 @@ Valid transitions:
   in_review → approved
   in_review → declined
   in_review → open (return to queue)
+
+Invalid transitions return 409 Conflict:
+  approved → * (terminal state)
+  declined → * (terminal state)
+  Any other invalid transition
+
+Response: { error: "Invalid transition", message: "Cannot transition from {current} to {requested}", validTransitions: [...] }
 ```
 
 **Source Mapping (how decisions are created):**
@@ -570,10 +614,18 @@ GET    /hubs/{hubId}/decision-queue/{id}
 
 PATCH  /hubs/{hubId}/decision-queue/{id}
        — Update decision (state transition)
-       — Request: { status: DecisionStatus, comment?: string }
+       — Request: {
+           status: DecisionStatus,
+           reason?: string, // Why this decision was made
+           comment?: string // Additional notes
+         }
        — Only valid state transitions allowed (see state machine)
+       — Invalid transitions return 409 Conflict
        — Creates audit log entry (DecisionTransition)
-       — Response: { item: DecisionItem, transition: DecisionTransition }
+       — Response: {
+           item: DecisionItem, // Includes updatedBy, updatedAt
+           transition: DecisionTransition
+         }
 
 GET    /hubs/{hubId}/decision-queue/{id}/history
        — Get all transitions for a decision (audit trail)
@@ -595,6 +647,14 @@ PATCH  /hubs/{hubId}/risk-alerts/{id}/acknowledge
        — Acknowledge alert (removes from active list)
        — Request: { comment?: string }
        — Creates audit log entry
+       — Response: {
+           alert: RiskAlert,
+           audit: {
+             acknowledgedBy: string, // User ID
+             acknowledgedAt: string, // ISO timestamp
+             comment?: string
+           }
+         }
 ```
 
 ### Leadership (RBAC: Staff + Admin Required)
@@ -635,9 +695,18 @@ GET    /leadership/expansion
 ```
 
 **Data Freshness:**
-- All responses include `dataStaleTimestamp` — the oldest data point used
+- All responses include freshness metadata:
+  - `dataStaleTimestamp`: ISO timestamp of the oldest data point used
+  - `lastCalculatedAt`: ISO timestamp when metrics were last computed
+  - `lastRefreshedAt`: ISO timestamp when data was last fetched from sources
 - UI should show warning if `dataStaleTimestamp` > 24 hours old
-- Consider refresh button to trigger recalculation
+- Refresh endpoint to trigger recalculation:
+
+```
+POST   /leadership/refresh
+       — Triggers async recalculation of all portfolio metrics
+       — Response: { status: "queued", estimatedCompletionMs: number }
+```
 
 ---
 
@@ -715,12 +784,20 @@ Evidence {
 - Encode special characters
 - Limit excerpt length to 500 characters
 
-**Client vs Staff Evidence:**
+**Client vs Staff Evidence (EXPLICIT RULES):**
+
 | Field | Staff-facing | Client-facing |
 |-------|--------------|---------------|
-| sourceLink | Include | Omit |
-| Internal sources | Include | Omit entirely |
+| sourceLink | Include | **NEVER include** — always omit |
+| Internal sources | Include | **NEVER include** — omit entire evidence item |
+| Raw HTML | Sanitized | **NEVER include** — server sanitizes all excerpts |
 | Redaction level | Light | Strict |
+
+**Enforcement:**
+- Server MUST strip `sourceLink` from all client-facing responses before sending
+- Server MUST filter out evidence items from internal sources for client-facing responses
+- Server MUST sanitize all HTML before including in any response (staff or client)
+- Client should never receive raw HTML or unsanitized content
 
 **Data Retention:**
 - Instant Answers: Cache for 24 hours, then expire
