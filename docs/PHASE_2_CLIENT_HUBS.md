@@ -1,9 +1,9 @@
 # Phase 2: Client Hub Expansion
 
-**Document Version:** 1.1
+**Document Version:** 1.2
 **Last Updated:** November 2025
 **Status:** Planning Complete — Ready for Implementation
-**Revision:** Incorporated senior dev review feedback (routing, async patterns, type specifics, testing plan)
+**Revision:** Final review — added async job flows, Decision Queue schema, Project associations, RBAC, conversion atomicity, PII contract
 
 ---
 
@@ -166,25 +166,143 @@ One-time welcome modal for clients accessing a converted hub:
 **Files to create:**
 
 `src/types/project.ts`:
-- `Project { id, hubId, name, description, status, startDate, targetEndDate, lead, milestones[] }`
-- `ProjectStatus: "active" | "on_hold" | "completed" | "cancelled"`
-- `ProjectMilestone { id, name, targetDate, status, description }`
-- Links to documents/messages/meetings via IDs
+```typescript
+Project {
+  id: string
+  hubId: string
+  name: string
+  description?: string
+  status: ProjectStatus
+  startDate: string // ISO date
+  targetEndDate?: string // ISO date
+  lead?: string // user ID
+  milestones: ProjectMilestone[]
+}
+ProjectStatus: "active" | "on_hold" | "completed" | "cancelled"
+ProjectMilestone { id, name, targetDate, status, description }
+```
+
+**Project Associations** — Add `projectId?: string` to existing types:
+- `src/types/document.ts` — `Document.projectId?: string`
+- `src/types/video.ts` — `Video.projectId?: string`
+- `src/types/message.ts` — `Message.projectId?: string`
+- `src/types/meeting.ts` — `Meeting.projectId?: string`
+
+This enables filtering artifacts by project and rolling up views per workstream.
 
 `src/types/client-intelligence.ts`:
-- `InstantAnswer { id, question, answer, source, confidence: "high"|"medium"|"low", status: "queued"|"ready"|"failed" }`
-- `DecisionItem { id, title, description, dueDate, status, assignee, reason }`
-- `MeetingPrep { meetingId, summary, sinceLastMeeting[], decisionsNeeded[] }`
-- `MeetingFollowUp { meetingId, summary, agreedActions[], decisions[] }`
-- `PerformanceNarrative { hubId, period, summaries[], recommendations[] }`
-- `InstitutionalMemoryEvent { date, event, significance }`
-- `RiskAlert { id, type, severity: "high"|"medium"|"low", driver, title, description, recommendation, acknowledgedAt? }`
+```typescript
+// Async AI Job Pattern
+InstantAnswerRequest { id: string, hubId: string, question: string, createdAt: string }
+InstantAnswerResponse {
+  id: string
+  status: "queued" | "ready" | "error"
+  question: string
+  answer?: string
+  source?: string
+  confidence?: "high" | "medium" | "low"
+  evidence?: Evidence[]
+  createdAt: string
+  completedAt?: string
+}
+
+// Decision Queue (full schema)
+DecisionItem {
+  id: string
+  hubId: string
+  title: string
+  description?: string
+  dueDate?: string // ISO date
+  requestedBy: string // user ID
+  assignee?: string // user ID
+  status: DecisionStatus
+  relatedResource?: { type: "message" | "document" | "meeting", id: string }
+  createdAt: string
+  updatedAt: string
+}
+DecisionStatus: "open" | "in_review" | "approved" | "declined"
+DecisionTransition { fromStatus: DecisionStatus, toStatus: DecisionStatus, comment?: string, changedBy: string, changedAt: string }
+
+// Meeting Intelligence (async)
+MeetingPrepRequest { meetingId: string, status: "queued" | "ready" | "error" }
+MeetingPrep {
+  meetingId: string
+  status: "queued" | "ready" | "error"
+  summary?: string
+  sinceLastMeeting?: string[]
+  decisionsNeeded?: string[]
+  generatedAt?: string
+}
+MeetingFollowUp {
+  meetingId: string
+  status: "queued" | "ready" | "error"
+  summary?: string
+  agreedActions?: string[]
+  decisions?: string[]
+  generatedAt?: string
+}
+
+// Performance (async)
+PerformanceNarrative {
+  hubId: string
+  projectId?: string
+  period: string
+  status: "queued" | "ready" | "error"
+  summaries?: string[]
+  recommendations?: string[]
+  generatedAt?: string
+}
+
+InstitutionalMemoryEvent { date: string, event: string, significance: "high" | "medium" | "low" }
+RiskAlert { id, type, severity: "high"|"medium"|"low", driver, title, description, recommendation, acknowledgedAt?, acknowledgedBy? }
+```
 
 `src/types/relationship-intelligence.ts`:
-- `RelationshipHealth { score: 0-100, status, trend, drivers[] }`
-- `HealthDriver { type, weight, excerpt?, timestamp }`
-- `ExpansionOpportunity { id, title, evidence[], confidence, status: "open"|"in_progress"|"won"|"lost", notes? }`
-- `ExpansionEvidence { source, excerpt, date, evidenceRedacted: boolean }`
+```typescript
+RelationshipHealth {
+  hubId: string
+  score: number // 0-100
+  status: "strong" | "stable" | "at_risk"
+  trend: "improving" | "stable" | "declining"
+  drivers: HealthDriver[]
+  lastCalculated: string // ISO timestamp
+}
+HealthDriver { type: string, weight: number, excerpt?: string, timestamp: string }
+
+ExpansionOpportunity {
+  id: string
+  hubId: string
+  title: string
+  confidence: "high" | "medium" | "low"
+  status: "open" | "in_progress" | "won" | "lost"
+  evidence: Evidence[]
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+// Shared Evidence type with PII handling
+Evidence {
+  id: string
+  source: string // e.g., "email", "meeting_transcript", "document"
+  sourceLink?: string // link to original resource
+  excerpt: string // HTML-sanitized, PII-scrubbed
+  redacted: boolean // true if excerpt was modified for privacy
+  date: string
+}
+```
+
+`src/types/user.ts` (modify existing):
+```typescript
+// Add admin permission for leadership access
+UserRole: "staff" | "client"
+UserPermissions {
+  isAdmin: boolean // Required for /leadership/* endpoints
+  canConvertHubs: boolean
+  canViewAllHubs: boolean
+}
+// Full user type includes: User { id, email, displayName, role, permissions }
+```
 
 ### Phase 2: Services & Mock Data
 
@@ -250,17 +368,42 @@ One-time welcome modal for clients accessing a converted hub:
 
 ## 6. API Endpoints for Stephen
 
-### Hub Conversion
+### Hub Conversion (Atomic Operation)
 
 ```
 POST   /hubs/{hubId}/convert
-       — Convert pitch to client hub (MUST be idempotent)
+       — Convert pitch to client hub
+       — MUST be idempotent: calling twice returns same result, no side effects
        — Request: { initialProjectName?: string }
-       — Response: { hub: Hub, archiveSummary: { proposalArchived, questionnaireArchived } }
-       — Migration: Archive proposal → Documents, questionnaire → History, set hubType="client"
+       — Response: {
+           hub: Hub,
+           archiveSummary: {
+             proposalArchived: boolean,
+             proposalDocumentId?: string, // ID of archived proposal in Documents
+             questionnaireArchived: boolean,
+             questionnaireHistoryId?: string // ID of questionnaire in History
+           },
+           project?: Project // If initialProjectName was provided
+         }
 ```
 
-**Note:** Consider `POST /hubs/{hubId}/convert/rollback` for recovery in early phases (internal only).
+**Conversion Operations (must be atomic):**
+1. Archive proposal → Create document in Documents section with `category: "archived_proposal"`
+2. Archive questionnaire → If completed, create entry in History; if incomplete, mark as hidden
+3. Set `hubType = "client"`, `convertedAt = now()`, `convertedBy = currentUserId`
+4. Optionally create first Project if `initialProjectName` provided
+
+**Idempotency behavior:**
+- If hub already converted (`hubType === "client"`), return existing state without modification
+- Response includes `alreadyConverted: boolean` flag
+
+```
+POST   /hubs/{hubId}/convert/rollback
+       — INTERNAL USE ONLY — Early-phase recovery
+       — Requires: staff + isAdmin
+       — Reverses conversion: restore proposal, unarchive questionnaire, set hubType="pitch"
+       — NOT for production use — document as non-production endpoint
+```
 
 ### Relationship Intelligence
 
@@ -278,61 +421,223 @@ PATCH  /hubs/{hubId}/expansion-opportunities/{id}
 ### Projects
 
 ```
-GET    /hubs/{hubId}/projects                   — List projects (supports pagination)
-POST   /hubs/{hubId}/projects                   — Create project
-GET    /hubs/{hubId}/projects/{projectId}       — Get project
-PATCH  /hubs/{hubId}/projects/{projectId}       — Update project
-DELETE /hubs/{hubId}/projects/{projectId}       — Delete project
+GET    /hubs/{hubId}/projects
+       — List projects (supports pagination)
+       — Query params: ?status=active&page=1&pageSize=20
+
+POST   /hubs/{hubId}/projects
+       — Create project
+       — Request: { name, description?, status?, startDate?, targetEndDate?, lead? }
+
+GET    /hubs/{hubId}/projects/{projectId}
+       — Get project with milestones
+
+PATCH  /hubs/{hubId}/projects/{projectId}
+       — Update project
+       — Request: { name?, description?, status?, startDate?, targetEndDate?, lead? }
+
+DELETE /hubs/{hubId}/projects/{projectId}
+       — Soft delete (mark as cancelled, retain for history)
 ```
 
-### Client Intelligence (Async Pattern for AI)
-
-AI-powered endpoints use async pattern to handle latency:
-
+**Project-filtered artifact endpoints:**
+All existing artifact endpoints accept optional `?projectId=` filter:
 ```
-POST   /hubs/{hubId}/instant-answer
+GET    /hubs/{hubId}/documents?projectId={projectId}
+GET    /hubs/{hubId}/videos?projectId={projectId}
+GET    /hubs/{hubId}/messages?projectId={projectId}
+GET    /hubs/{hubId}/meetings?projectId={projectId}
+```
+
+**Assigning artifacts to projects:**
+```
+PATCH  /hubs/{hubId}/documents/{docId}         — { projectId?: string }
+PATCH  /hubs/{hubId}/videos/{videoId}          — { projectId?: string }
+PATCH  /hubs/{hubId}/messages/{msgId}          — { projectId?: string }
+PATCH  /hubs/{hubId}/meetings/{meetingId}      — { projectId?: string }
+```
+
+### Client Intelligence (Async Job Pattern for AI)
+
+All AI-powered endpoints use a consistent async job pattern:
+
+**Pattern: POST creates job → GET polls for result**
+
+#### Instant Answers
+```
+POST   /hubs/{hubId}/instant-answer/requests
        — Request: { question: string }
-       — Response: { answerId: string, status: "queued" }
+       — Response: { answerId: string, status: "queued", createdAt: string }
 
 GET    /hubs/{hubId}/instant-answer/{answerId}
-       — Response: { status: "queued"|"ready"|"failed", answer?, source?, confidence? }
-       — UI should poll until status="ready" or show "preparing..." state
+       — Response: {
+           id: string,
+           status: "queued" | "ready" | "error",
+           question: string,
+           answer?: string,
+           source?: string,
+           confidence?: "high" | "medium" | "low",
+           evidence?: Evidence[], // PII-scrubbed excerpts
+           createdAt: string,
+           completedAt?: string,
+           error?: string // Only if status="error"
+         }
+       — UI polls every 2s until status="ready" or "error"
+       — Show "preparing..." state while status="queued"
 
 GET    /hubs/{hubId}/instant-answer/latest
-       — Returns most recent answers for this hub (cached)
+       — Returns most recent answers for this hub (cached, max 10)
+       — Query params: ?limit=10
 ```
 
+#### Meeting Prep/Follow-up (Async)
 ```
-GET    /hubs/{hubId}/decision-queue             — Get pending decisions
-PATCH  /hubs/{hubId}/decision-queue/{id}        — Update decision status
+POST   /hubs/{hubId}/meetings/{meetingId}/prep/generate
+       — Triggers prep generation
+       — Response: { status: "queued" }
 
-GET    /hubs/{hubId}/meetings/{id}/prep         — Get meeting prep (may be async)
-GET    /hubs/{hubId}/meetings/{id}/follow-up    — Get meeting follow-up (may be async)
+GET    /hubs/{hubId}/meetings/{meetingId}/prep
+       — Response: {
+           meetingId: string,
+           status: "queued" | "ready" | "error",
+           summary?: string,
+           sinceLastMeeting?: string[],
+           decisionsNeeded?: string[],
+           generatedAt?: string
+         }
 
-GET    /hubs/{hubId}/performance                — Get performance narrative
-       — Query params: ?projectId=...
-       — Response includes { status: "ready"|"generating" }
+POST   /hubs/{hubId}/meetings/{meetingId}/follow-up/generate
+       — Triggers follow-up generation (call after meeting ends)
 
-GET    /hubs/{hubId}/history                    — Get institutional memory
+GET    /hubs/{hubId}/meetings/{meetingId}/follow-up
+       — Same pattern as prep
+```
+
+#### Performance Narratives (Async)
+```
+POST   /hubs/{hubId}/performance/generate
+       — Request: { projectId?: string, period?: string }
+       — Response: { narrativeId: string, status: "queued" }
+
+GET    /hubs/{hubId}/performance/{narrativeId}
+       — Response: {
+           id: string,
+           hubId: string,
+           projectId?: string,
+           period: string,
+           status: "queued" | "ready" | "error",
+           summaries?: string[],
+           recommendations?: string[],
+           generatedAt?: string
+         }
+
+GET    /hubs/{hubId}/performance/latest
+       — Returns most recent narrative (cached)
+```
+
+### Decision Queue (Full Specification)
+
+**Schema:** See `DecisionItem` in types section.
+
+**State Machine:**
+```
+Valid transitions:
+  open → in_review (staff picks up)
+  open → approved (fast-track approval)
+  open → declined (fast-track decline)
+  in_review → approved
+  in_review → declined
+  in_review → open (return to queue)
+```
+
+**Source Mapping (how decisions are created):**
+- Tagged messages: Messages with `requiresDecision: true` flag
+- Flagged documents: Documents with `awaitingApproval: true`
+- Meeting action items: Action items marked `type: "decision_required"`
+- Manual creation: Staff creates via UI
+
+```
+GET    /hubs/{hubId}/decision-queue
+       — Query params: ?status=open&assignee=userId&page=1&pageSize=20
+       — Response: { items: DecisionItem[], total: number, page: number }
+
+POST   /hubs/{hubId}/decision-queue
+       — Create decision item manually
+       — Request: { title, description?, dueDate?, assignee?, relatedResource? }
+
+GET    /hubs/{hubId}/decision-queue/{id}
+       — Get single decision with transition history
+
+PATCH  /hubs/{hubId}/decision-queue/{id}
+       — Update decision (state transition)
+       — Request: { status: DecisionStatus, comment?: string }
+       — Only valid state transitions allowed (see state machine)
+       — Creates audit log entry (DecisionTransition)
+       — Response: { item: DecisionItem, transition: DecisionTransition }
+
+GET    /hubs/{hubId}/decision-queue/{id}/history
+       — Get all transitions for a decision (audit trail)
+```
+
+### History & Alerts
+
+```
+GET    /hubs/{hubId}/history
+       — Get institutional memory timeline
        — Query params: ?page=1&pageSize=20&type=...&fromDate=...&toDate=...
+       — Types: "message", "meeting", "document", "decision", "milestone", "conversion"
 
-GET    /hubs/{hubId}/risk-alerts                — Get risk alerts
-PATCH  /hubs/{hubId}/risk-alerts/{id}/acknowledge — Acknowledge alert
+GET    /hubs/{hubId}/risk-alerts
+       — Get active risk alerts
+       — Response: { alerts: RiskAlert[], acknowledgedCount: number }
+
+PATCH  /hubs/{hubId}/risk-alerts/{id}/acknowledge
+       — Acknowledge alert (removes from active list)
+       — Request: { comment?: string }
+       — Creates audit log entry
 ```
 
-### Leadership (Staff Role Required)
+### Leadership (RBAC: Staff + Admin Required)
+
+**Access Control:**
+- Requires: `role === "staff" && permissions.isAdmin === true`
+- Portal/client users: 403 Forbidden
+- Staff without admin: 403 Forbidden with message "Leadership views require admin permissions"
 
 ```
-GET    /leadership/portfolio                    — Get portfolio overview
-GET    /leadership/clients                      — Get clients grid (health vs expansion)
-GET    /leadership/at-risk                      — Get at-risk clients
-GET    /leadership/expansion                    — Get expansion candidates
+GET    /leadership/portfolio
+       — Get portfolio overview (aggregated metrics)
+       — Response: {
+           totalClients: number,
+           atRiskCount: number,
+           expansionReadyCount: number,
+           avgHealthScore: number,
+           dataStaleTimestamp: string // ISO timestamp of oldest data
+         }
 
-All leadership endpoints:
-- Require: staff role + internal admin scope
-- No portal/client role access
-- Include: { dataStaleTimestamp } for freshness indicator
+GET    /leadership/clients
+       — Get clients grid (health vs expansion matrix)
+       — Query params: ?sortBy=health|expansion|name&order=asc|desc
+       — Response: {
+           clients: [{
+             hubId, name, healthScore, healthStatus, expansionPotential, lastActivity
+           }],
+           dataStaleTimestamp: string
+         }
+
+GET    /leadership/at-risk
+       — Get at-risk clients (healthStatus === "at_risk")
+       — Response: { clients: [...], dataStaleTimestamp }
+
+GET    /leadership/expansion
+       — Get expansion candidates (have opportunities with confidence ≥ medium)
+       — Response: { clients: [...], opportunities: [...], dataStaleTimestamp }
 ```
+
+**Data Freshness:**
+- All responses include `dataStaleTimestamp` — the oldest data point used
+- UI should show warning if `dataStaleTimestamp` > 24 hours old
+- Consider refresh button to trigger recalculation
 
 ---
 
@@ -380,16 +685,48 @@ All leadership endpoints:
 - How to handle "I don't know" gracefully?
 - Context window management for large histories?
 
-### 7.4 Privacy & Data Handling
+### 7.4 Privacy & Data Handling (Contract)
 
-**PII Scrubbing:**
-- Evidence excerpts shown in Expansion Radar must be scrubbed of sensitive PII
-- Consider `evidenceRedacted: boolean` flag when full excerpt cannot be shown
-- Client-facing surfaces (Instant Answers) need stricter filtering than staff-facing
+**Evidence Type Contract:**
+All evidence excerpts in API responses MUST use this structure:
+```typescript
+Evidence {
+  id: string
+  source: "email" | "meeting_transcript" | "document" | "chat"
+  sourceLink?: string // Link to original (staff-only, omit for client-facing)
+  excerpt: string // HTML-sanitized, PII-scrubbed text
+  redacted: boolean // true if excerpt was modified for privacy
+  date: string // ISO date
+}
+```
+
+**PII Scrubbing Rules:**
+1. **Always scrub:** Phone numbers, email addresses, physical addresses, financial account numbers
+2. **Context-dependent:** Names of non-hub members, company names not in hub context
+3. **Never show to clients:** Internal staff discussions, pricing discussions, competitor mentions
+
+**Redaction Policy:**
+- When PII is removed, set `redacted: true`
+- Replace PII with `[REDACTED]` placeholder
+- If entire excerpt would be redacted, omit the evidence item entirely
+
+**HTML Sanitization (Server-side):**
+- Strip all HTML tags except: `<b>`, `<i>`, `<em>`, `<strong>`
+- Encode special characters
+- Limit excerpt length to 500 characters
+
+**Client vs Staff Evidence:**
+| Field | Staff-facing | Client-facing |
+|-------|--------------|---------------|
+| sourceLink | Include | Omit |
+| Internal sources | Include | Omit entirely |
+| Redaction level | Light | Strict |
 
 **Data Retention:**
-- Define retention policies for AI-generated content
-- Cached answers should expire (suggested: 24h for instant answers, 7d for performance narratives)
+- Instant Answers: Cache for 24 hours, then expire
+- Performance Narratives: Cache for 7 days
+- Meeting Prep/Follow-up: Cache until meeting + 7 days
+- Evidence excerpts: Do not cache; regenerate from source on each request
 
 ### 7.5 Rate Limiting & Performance
 
@@ -468,43 +805,79 @@ All leadership endpoints:
 - `conversion.spec.ts` — Staff can complete full conversion wizard
 - Test: Navigate to won pitch → Click convert → Complete all steps → Verify hub type changed
 - Test: Conversion is idempotent (re-converting already converted hub shows appropriate message)
+- Test: Content lifecycle — proposal archived to Documents, questionnaire handled correctly
+- Test: First project created if name provided during conversion
 
 **Hub Type Routing:**
 - `hub-type-routing.spec.ts` — Correct features shown per hub type
 - Test: Pitch hub shows proposal section, no projects
-- Test: Client hub shows projects section, archived proposal
-- Test: Navigation item count respects progressive disclosure limits
+- Test: Client hub shows projects section, archived proposal in Documents
+- Test: Navigation item count respects progressive disclosure limits (max 7 staff / 6 client)
 
 **Client Portal Transition:**
 - `client-transition.spec.ts` — Client experiences after conversion
 - Test: Client sees welcome modal on first visit to converted hub
 - Test: Modal dismissal persists (localStorage)
 - Test: New client features (Decision Queue, Instant Answers) are accessible
+- Test: Domain-restricted invite still works (security)
 
 **Empty States:**
 - `empty-states.spec.ts` — All sections render appropriately when empty
 - Test: Each new section shows designed empty state
 - Test: Empty states have correct CTAs where applicable
 
+**Projects:**
+- `projects.spec.ts` — Project CRUD and artifact filtering
+- Test: Create project with all fields
+- Test: Assign document/video/message/meeting to project via PATCH
+- Test: Filter artifacts by projectId shows correct subset
+- Test: Delete project (soft delete) retains in history
+
+**Intelligence (Async):**
+- `intelligence.spec.ts` — Async job flows
+- Test: Instant Answer shows "preparing..." while status="queued"
+- Test: Instant Answer displays result when status="ready"
+- Test: Instant Answer shows error state when status="error"
+- Test: Stale cache behavior (answers older than 24h marked as stale)
+- Test: Meeting prep generates and displays correctly
+
+**Decision Queue:**
+- `decision-queue.spec.ts` — State transitions and audit
+- Test: Valid transitions only (open→in_review, in_review→approved, etc.)
+- Test: Invalid transitions rejected with error message
+- Test: Transition creates audit log entry
+- Test: Filter by status and assignee works
+
 **Leadership Views:**
 - `leadership.spec.ts` — Portfolio view access and rendering
 - Test: Staff with admin role can access `/leadership`
+- Test: Staff without admin gets 403 with helpful message
+- Test: Client/portal users get 403 (no access)
 - Test: Portfolio grid renders with client cards
 - Test: Filters work correctly
+- Test: Data freshness indicator shows when stale (>24h)
 
 ### 10.2 Unit Test Priorities
 
 **Type Guards:**
 - `isPitchHub()` / `isClientHub()` — discriminator functions work correctly
+- `isValidDecisionTransition()` — state machine enforcement
 
 **Service Functions:**
-- `convertToClientHub()` — returns expected structure
+- `convertToClientHub()` — returns expected structure, handles idempotency
 - `getRelationshipHealth()` — handles missing data gracefully
 - Health score calculation when activity count < threshold
+- Decision transition validation
 
 **Hook Behavior:**
-- Query key factories produce correct keys
+- Query key factories produce correct keys with projectId filters
 - Mutation invalidates correct queries after conversion
+- Polling hooks stop when status !== "queued"
+
+**Evidence/PII:**
+- Evidence scrubbing removes PII correctly
+- Redacted flag set when content modified
+- Client-facing evidence omits sourceLink
 
 ### 10.3 Manual Testing Checklist
 
@@ -512,23 +885,167 @@ All leadership endpoints:
 - [ ] Hub type is visually obvious within 2 seconds
 - [ ] Navigation doesn't exceed 7 items (staff) / 6 items (client)
 - [ ] All empty states are helpful, not just "No data"
-- [ ] AI interfaces have clear "thinking" states
+- [ ] AI interfaces have clear "preparing..." states
 - [ ] Badge thresholds work (no badges on insufficient data)
+- [ ] Decision Queue shows valid action buttons per state
+- [ ] Project filtering updates artifact lists immediately
+- [ ] Leadership data freshness warning appears when appropriate
 
 ---
 
-## 11. Success Criteria
+## 11. Implementation Guardrails
+
+These guardrails ensure consistency with GOLDEN_RULES.md and existing patterns.
+
+### 11.1 Types First
+
+Before writing any services or components, complete all type definitions:
+
+```
+Order of implementation:
+1. src/types/hub.ts — Add hubType, convertedAt, convertedBy
+2. src/types/user.ts — Add UserPermissions with isAdmin
+3. src/types/project.ts — New file with Project, ProjectStatus, ProjectMilestone
+4. src/types/client-intelligence.ts — New file with all AI types
+5. src/types/relationship-intelligence.ts — New file with health/expansion types
+6. Modify existing types — Add projectId to Document, Video, Message, Meeting
+```
+
+### 11.2 Services & Hooks
+
+**Query Key Factories:**
+```typescript
+// Pattern: serialize with projectId and pagination
+const projectKeys = {
+  all: ['projects'] as const,
+  lists: () => [...projectKeys.all, 'list'] as const,
+  list: (hubId: string, filters?: { status?: string; page?: number }) =>
+    [...projectKeys.lists(), hubId, filters] as const,
+  details: () => [...projectKeys.all, 'detail'] as const,
+  detail: (hubId: string, projectId: string) =>
+    [...projectKeys.details(), hubId, projectId] as const,
+}
+```
+
+**Async Polling Pattern:**
+```typescript
+// Use React Query's refetchInterval for polling
+const { data } = useQuery({
+  queryKey: ['instant-answer', answerId],
+  queryFn: () => getInstantAnswer(hubId, answerId),
+  refetchInterval: (data) =>
+    data?.status === 'queued' ? 2000 : false, // Poll every 2s while queued
+  enabled: !!answerId,
+})
+```
+
+**Cache Recent Results:**
+- Cache instant answers per hub (max 10, expire after 24h)
+- Use `staleTime` and `cacheTime` appropriately
+
+### 11.3 UI Guardrails
+
+**Feature Gating by Hub Type:**
+```typescript
+// Pattern: Use hubType discriminator for conditional rendering
+const isClientHub = hub.hubType === 'client'
+
+// In navigation
+{isClientHub && <NavItem to="projects">Projects</NavItem>}
+{!isClientHub && <NavItem to="proposal">Proposal</NavItem>}
+```
+
+**Progressive Disclosure Enforcement:**
+```typescript
+// Constants for nav limits
+const MAX_STAFF_NAV_ITEMS = 7
+const MAX_CLIENT_NAV_ITEMS = 6
+
+// Validate in component
+if (visibleNavItems.length > MAX_STAFF_NAV_ITEMS) {
+  console.warn('Navigation exceeds maximum items')
+}
+```
+
+**Component Size Limits:**
+- Extract subcomponents from day one
+- No file over 300 lines
+- No function over 40 lines
+- If a component grows large, split into: Container (logic) + Presentation (UI)
+
+### 11.4 Observability
+
+**Event Logging:**
+Extend existing `trackHubViewed` pattern with new events:
+
+```typescript
+// New event types to add
+type HubEventType =
+  | 'hub_converted'
+  | 'project_created'
+  | 'project_updated'
+  | 'decision_transitioned'
+  | 'health_viewed'
+  | 'expansion_viewed'
+  | 'expansion_status_changed'
+  | 'instant_answer_requested'
+  | 'leadership_accessed'
+
+// Log pattern
+trackEvent({
+  type: 'decision_transitioned',
+  hubId,
+  decisionId,
+  fromStatus,
+  toStatus,
+  userId: currentUser.id,
+  timestamp: new Date().toISOString(),
+})
+```
+
+### 11.5 Error Handling
+
+**Async Job Errors:**
+- Display user-friendly error messages, not raw API errors
+- Offer retry action for failed jobs
+- Log errors for debugging
+
+**State Transition Errors:**
+- Decision Queue: Show which transitions are valid from current state
+- Conversion: If partial failure, show what succeeded and what failed
+
+---
+
+## 12. Success Criteria
 
 Phase 2 is complete when:
 
-1. Staff can convert a won pitch to a Client Hub via guided wizard
+### Functional Requirements
+1. Staff can convert a won pitch to a Client Hub via guided wizard (atomic, idempotent)
 2. Client Hubs show Projects, Relationship Health, and Expansion Radar
 3. Clients see Instant Answers, Decision Queue, Performance, and History
-4. Leadership can view portfolio grid with health/expansion dimensions
-5. All new sections have designed empty states
-6. Navigation uses progressive disclosure (max 7 staff / 6 client items)
-7. API specification is updated with all new endpoints
-8. Documentation is updated for Stephen's middleware development
+4. Leadership can view portfolio grid with health/expansion dimensions (admin-only)
+5. Projects can be created and artifacts assigned via projectId
+6. Decision Queue supports full state machine with audit trail
+7. AI features show "preparing..." state and handle errors gracefully
+
+### UX Requirements
+8. All new sections have designed empty states
+9. Navigation uses progressive disclosure (max 7 staff / 6 client items)
+10. Hub type is visually obvious within 2 seconds
+
+### Technical Requirements
+11. All types defined before services/components
+12. Query keys include projectId filters and pagination
+13. Async polling stops when job completes
+14. Evidence excerpts are PII-scrubbed with redacted flag
+15. Event logging covers all new user actions
+
+### Documentation Requirements
+16. API specification updated with all new endpoints (async patterns documented)
+17. Decision Queue state machine and source mapping documented
+18. RBAC requirements documented for leadership endpoints
+19. PII scrubbing contract codified
 
 ---
 
