@@ -28,7 +28,7 @@ export async function loginAsStaff(page: Page): Promise<void> {
   // Use label-based selectors for stability
   await page.getByLabel(/email/i).fill(MOCK_STAFF_USER.email);
   await page.getByLabel(/password/i).fill(MOCK_STAFF_USER.password);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
 
   // Wait for redirect to hubs list
   await expect(page).toHaveURL(/\/hubs/);
@@ -42,7 +42,7 @@ export async function loginAsClient(page: Page): Promise<void> {
   // Use label-based selectors for stability
   await page.getByLabel(/email/i).fill(MOCK_CLIENT_USER.email);
   await page.getByLabel(/password/i).fill(MOCK_CLIENT_USER.password);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
 
   // Wait for redirect to portal
   await expect(page).toHaveURL(/\/portal\//);
