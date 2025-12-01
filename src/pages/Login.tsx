@@ -131,7 +131,7 @@ const Login = () => {
           </Card>
 
           {/* Right Side: Demo Credentials */}
-          <Card className="lg:w-80 p-6 md:p-8 shadow-xl border-0 bg-white/95 backdrop-blur-sm">
+          <Card className="lg:w-96 p-6 md:p-8 shadow-xl border-0 bg-white/95 backdrop-blur-sm">
             <div className="space-y-4">
               <div>
                 <h2 className="text-xl font-bold text-[hsl(var(--bold-royal-blue))] mb-2">
@@ -141,31 +141,62 @@ const Login = () => {
                   Click a card below to auto-fill the login form
                 </p>
               </div>
-              
+
               <div className="space-y-3">
-                {/* Client Demo */}
-                <Card
-                  className="p-4 cursor-pointer hover:border-[hsl(var(--gradient-blue))] hover:shadow-md transition-all duration-200"
-                  onClick={() => fillDemoCredentials("sarah@whitmorelaw.co.uk", "password123")}
-                >
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-[hsl(var(--bold-royal-blue))]">Client Login</p>
-                    <p className="text-xs text-[hsl(var(--medium-grey))]">sarah@whitmorelaw.co.uk</p>
-                    <p className="text-xs text-[hsl(var(--medium-grey))]">password123</p>
-                  </div>
-                </Card>
-                
                 {/* Staff Demo */}
-                <Card 
-                  className="p-4 cursor-pointer hover:border-[hsl(var(--deep-navy))] hover:shadow-md transition-all duration-200"
+                <Card
+                  className="p-4 cursor-pointer hover:border-[hsl(var(--deep-navy))] hover:shadow-md transition-all duration-200 border-2"
                   onClick={() => fillDemoCredentials("hamish@goagentflow.com", "password123")}
                 >
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-[hsl(var(--deep-navy))]">AgentFlow Staff</p>
                     <p className="text-xs text-[hsl(var(--medium-grey))]">hamish@goagentflow.com</p>
-                    <p className="text-xs text-[hsl(var(--medium-grey))]">password123</p>
+                    <p className="text-xs text-[hsl(var(--sage-green))] mt-1">
+                      Full access to Pitch Hubs + Client Hubs + Leadership
+                    </p>
                   </div>
                 </Card>
+
+                {/* Divider with label */}
+                <div className="pt-2">
+                  <p className="text-xs font-semibold text-[hsl(var(--medium-grey))] uppercase tracking-wide">Client Logins</p>
+                </div>
+
+                {/* Sarah - Pitch Hub Client */}
+                <Card
+                  className="p-4 cursor-pointer hover:border-[hsl(var(--gradient-blue))] hover:shadow-md transition-all duration-200"
+                  onClick={() => fillDemoCredentials("sarah@whitmorelaw.co.uk", "password123")}
+                >
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-[hsl(var(--bold-royal-blue))]">Sarah - Pitch Hub Client</p>
+                    <p className="text-xs text-[hsl(var(--medium-grey))]">sarah@whitmorelaw.co.uk</p>
+                    <p className="text-xs text-[hsl(var(--gradient-blue))] mt-1">
+                      Prospect view: Proposal, Videos, Documents, Meetings
+                    </p>
+                  </div>
+                </Card>
+
+                {/* Alex - Client Hub Client */}
+                <Card
+                  className="p-4 cursor-pointer hover:border-[hsl(var(--rich-violet))] hover:shadow-md transition-all duration-200"
+                  onClick={() => fillDemoCredentials("alex@meridiandigital.co", "password123")}
+                >
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-[hsl(var(--rich-violet))]">Alex - Client Hub Client</p>
+                    <p className="text-xs text-[hsl(var(--medium-grey))]">alex@meridiandigital.co</p>
+                    <p className="text-xs text-[hsl(var(--rich-violet))] mt-1">
+                      Active client view: AI Answers, Decisions, Performance, History
+                    </p>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Hub Types Explanation */}
+              <div className="pt-2 border-t border-[hsl(var(--gradient-purple))]/20">
+                <p className="text-xs text-[hsl(var(--medium-grey))] leading-relaxed">
+                  <strong>Pitch Hubs</strong> are for prospects (proposals, pitching).
+                  <strong> Client Hubs</strong> are for active clients (projects, AI insights, decisions).
+                </p>
               </div>
             </div>
           </Card>

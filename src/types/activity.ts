@@ -25,6 +25,8 @@ export enum EventType {
   QUESTIONNAIRE_COMPLETED = "questionnaire.completed",
   SHARE_SENT = "share.sent",
   SHARE_ACCEPTED = "share.accepted",
+  // Phase 2: Leadership events (not hub-scoped)
+  LEADERSHIP_ACCESSED = "leadership.accessed",
 }
 
 // Activity event entity (stored/returned from API)
@@ -39,7 +41,7 @@ export interface ActivityEvent {
   metadata: EventMetadata;
 }
 
-// Discriminated union for log event requests - compiler enforces correct metadata
+// Discriminated union for log event requests (hub-scoped) - compiler enforces correct metadata
 export type LogEventRequest =
   | { eventType: EventType.HUB_VIEWED; metadata: HubViewedMetadata }
   | { eventType: EventType.PROPOSAL_VIEWED; metadata: ProposalViewedMetadata }
@@ -56,6 +58,12 @@ export type LogEventRequest =
   | { eventType: EventType.SHARE_SENT; metadata: ShareSentMetadata }
   | { eventType: EventType.SHARE_ACCEPTED; metadata: ShareAcceptedMetadata };
 
+// Leadership event requests (not hub-scoped)
+export type LeadershipLogEventRequest = {
+  eventType: EventType.LEADERSHIP_ACCESSED;
+  metadata: LeadershipAccessedMetadata;
+};
+
 // Event metadata union type (for ActivityEvent.metadata)
 export type EventMetadata =
   | HubViewedMetadata
@@ -71,7 +79,8 @@ export type EventMetadata =
   | QuestionnaireStartedMetadata
   | QuestionnaireCompletedMetadata
   | ShareSentMetadata
-  | ShareAcceptedMetadata;
+  | ShareAcceptedMetadata
+  | LeadershipAccessedMetadata;
 
 // Individual metadata types
 export interface HubViewedMetadata {
@@ -135,6 +144,11 @@ export interface ShareSentMetadata {
 
 export interface ShareAcceptedMetadata {
   inviteId: EntityId;
+}
+
+// Phase 2: Leadership view access (categorical only, no PII)
+export interface LeadershipAccessedMetadata {
+  view: "overview" | "all" | "at-risk" | "expansion";
 }
 
 // Activity feed item (for display)

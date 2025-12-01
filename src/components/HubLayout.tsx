@@ -9,22 +9,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCurrentUser, useLogout } from "@/hooks";
+import { useCurrentUser, useLogout, useHub } from "@/hooks";
+import { useHubId } from "@/contexts/hub-context";
 
 interface HubLayoutProps {
   children: React.ReactNode;
-  hubName?: string;
   viewMode?: "internal" | "client";
 }
 
 export function HubLayout({
   children,
-  hubName = "Whitmore & Associates Hub",
   viewMode = "internal"
 }: HubLayoutProps) {
   const navigate = useNavigate();
+  const hubId = useHubId();
+  const { data: hub } = useHub(hubId);
   const { data: authData } = useCurrentUser();
   const { mutate: logout } = useLogout();
+
+  // Build hub name from fetched data
+  const hubName = hub ? `${hub.companyName} Hub` : "Loading...";
 
   const user = authData?.user;
   const initials = user?.displayName

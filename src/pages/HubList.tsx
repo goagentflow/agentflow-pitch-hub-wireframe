@@ -10,10 +10,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Plus, ChevronDown, Loader2 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Plus, ChevronDown, Loader2, BarChart3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useHubs, useCurrentUser, useLogout } from "@/hooks";
-import type { HubStatus } from "@/types";
+import { hasAdminAccess } from "@/types";
+import type { HubStatus, HubType } from "@/types";
 
 const getStatusColor = (status: HubStatus) => {
   switch (status) {
@@ -51,10 +53,15 @@ const HubList = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<HubStatus | "all">("all");
+  const [hubTypeTab, setHubTypeTab] = useState<HubType>("pitch");
 
-  const { data: hubsData, isLoading, isError } = useHubs();
+  // Build filter string for hub query
+  const filterParam = hubTypeTab === "pitch" ? "hubType:pitch" : "hubType:client";
+  const { data: hubsData, isLoading, isError } = useHubs({ filter: filterParam });
   const { data: authData } = useCurrentUser();
   const { mutate: logout } = useLogout();
+
+  const isAdmin = authData?.user ? hasAdminAccess(authData.user) : false;
 
   const user = authData?.user;
   const userInitials = user?.displayName
@@ -93,47 +100,83 @@ const HubList = () => {
             Hub List
           </h1>
 
-          {/* User Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <Avatar className="h-9 w-9">
-                  <AvatarFallback className="bg-gradient-blue text-white text-sm font-medium">
-                    {userInitials}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-sm font-medium text-dark-grey hidden sm:inline">
-                  {user?.displayName ?? "Loading..."}
-                </span>
-                <ChevronDown className="h-4 w-4 text-medium-grey" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-white z-50">
-              <DropdownMenuItem className="cursor-pointer">Profile</DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">Settings</DropdownMenuItem>
-              <DropdownMenuItem
-                className="cursor-pointer text-destructive"
-                onClick={() => logout()}
+          {/* Right side: Leadership link (admin) + User Menu */}
+          <div className="flex items-center gap-4">
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden sm:flex items-center gap-2"
+                onClick={() => navigate("/leadership")}
               >
-                Sign Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <BarChart3 className="h-4 w-4" />
+                Leadership
+              </Button>
+            )}
+
+            {/* User Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                  <Avatar className="h-9 w-9">
+                    <AvatarFallback className="bg-gradient-blue text-white text-sm font-medium">
+                      {userInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-medium text-dark-grey hidden sm:inline">
+                    {user?.displayName ?? "Loading..."}
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-medium-grey" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-white z-50">
+                {isAdmin && (
+                  <DropdownMenuItem
+                    className="cursor-pointer sm:hidden"
+                    onClick={() => navigate("/leadership")}
+                  >
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Leadership
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem className="cursor-pointer">Profile</DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer">Settings</DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer text-destructive"
+                  onClick={() => logout()}
+                >
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {/* Page Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <h2 className="text-3xl md:text-4xl font-bold text-royal-blue">
-            Your Pitch Hubs
+            Your Hubs
           </h2>
           <Button className="bg-soft-coral hover:bg-soft-coral/90 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 w-full md:w-auto">
             <Plus className="w-5 h-5 mr-2" />
             Create New Hub
           </Button>
         </div>
+
+        {/* Hub Type Tabs */}
+        <Tabs value={hubTypeTab} onValueChange={(v) => setHubTypeTab(v as HubType)} className="mb-6">
+          <TabsList>
+            <TabsTrigger value="pitch" className="gap-2">
+              Pitch Hubs
+            </TabsTrigger>
+            <TabsTrigger value="client" className="gap-2">
+              Client Hubs
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {/* Search and Filter Bar */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
@@ -194,7 +237,11 @@ const HubList = () => {
         {/* Empty State */}
         {!isLoading && !isError && filteredHubs?.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-medium-grey">No hubs found matching your criteria.</p>
+            <p className="text-medium-grey">
+              {hubTypeTab === "pitch"
+                ? "No pitch hubs found. Create one to get started!"
+                : "No client hubs yet. Convert a won pitch hub to create your first client hub."}
+            </p>
           </div>
         )}
 
@@ -208,10 +255,20 @@ const HubList = () => {
                 onClick={() => navigate(`/hub/${hub.id}/overview`)}
               >
                 <div className="space-y-3">
-                  {/* Company Name */}
-                  <h3 className="text-xl font-bold text-dark-grey group-hover:text-royal-blue transition-colors">
-                    {hub.companyName}
-                  </h3>
+                  {/* Company Name + Hub Type Badge */}
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-xl font-bold text-dark-grey group-hover:text-royal-blue transition-colors">
+                      {hub.companyName}
+                    </h3>
+                    {hub.hubType === "client" && (
+                      <Badge
+                        variant="outline"
+                        className="border-[hsl(var(--rich-violet))] text-[hsl(var(--rich-violet))] text-xs flex-shrink-0"
+                      >
+                        Client
+                      </Badge>
+                    )}
+                  </div>
 
                   {/* Contact Name */}
                   <p className="text-medium-grey text-sm">{hub.contactName}</p>

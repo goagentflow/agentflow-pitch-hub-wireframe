@@ -15,6 +15,7 @@ import {
   useHubActivity,
   useTrackEngagement,
   useCurrentUser,
+  useHub,
 } from "@/hooks";
 import {
   WelcomeModal,
@@ -22,6 +23,8 @@ import {
   QuickLinksGrid,
   RecentActivityCard,
 } from "./client-overview";
+import { ClientWelcomeModal } from "./client-onboarding";
+import { ClientHubOverview } from "./client-hub-overview";
 
 export function ClientOverviewSection() {
   const navigate = useNavigate();
@@ -30,8 +33,12 @@ export function ClientOverviewSection() {
 
   // Get user info for welcome message
   const { data: authData } = useCurrentUser();
+  const { data: hub } = useHub(hubId);
   const userName = authData?.user?.displayName?.split(" ")[0] || "there";
   const companyName = authData?.hubAccess?.[0]?.hubName || "Your Project";
+
+  // Determine hub type for modal selection
+  const isClientHub = hub?.hubType === "client";
 
   // Data hooks
   const { data: config, isLoading: loadingConfig } = usePortalConfig(hubId);
@@ -50,16 +57,20 @@ export function ClientOverviewSection() {
     trackHubViewed("portal-overview");
   }, [trackHubViewed]);
 
-  // Show welcome modal on first visit (check localStorage)
+  // Show welcome modal on first visit for pitch hubs (check localStorage)
+  // Client hubs use ClientWelcomeModal which manages its own state
   useEffect(() => {
-    const hasSeenWelcome = localStorage.getItem(`portal-welcome-${hubId}`);
+    if (isClientHub) return; // Client hubs handle their own modal state
+    const storageKey = `portal-welcome-${hubId}`;
+    const hasSeenWelcome = localStorage.getItem(storageKey);
     if (!hasSeenWelcome && config) {
       setShowWelcomeModal(true);
     }
-  }, [hubId, config]);
+  }, [hubId, config, isClientHub]);
 
   const handleWelcomeClose = () => {
-    localStorage.setItem(`portal-welcome-${hubId}`, "true");
+    const storageKey = `portal-welcome-${hubId}`;
+    localStorage.setItem(storageKey, "true");
     setShowWelcomeModal(false);
   };
 
@@ -73,6 +84,21 @@ export function ClientOverviewSection() {
     );
   }
 
+  // Client Hub: Use redesigned overview focused on decisions, projects, messages
+  if (isClientHub) {
+    return (
+      <>
+        <ClientWelcomeModal
+          hubId={hubId}
+          hubName={companyName}
+          onDismiss={handleWelcomeClose}
+        />
+        <ClientHubOverview hubId={hubId} hubName={companyName} />
+      </>
+    );
+  }
+
+  // Pitch Hub: Original overview with proposal, videos, etc.
   // Calculate counts
   const videoCount = videosData?.items?.length || 0;
   const documentCount = docsData?.items?.length || 0;
@@ -96,9 +122,10 @@ export function ClientOverviewSection() {
 
   const activities = activityData?.items || [];
 
+  // Pitch Hub render path (client hubs return early above)
   return (
     <div className="min-h-screen bg-[hsl(var(--warm-cream))]">
-      {/* Welcome Modal */}
+      {/* Welcome Modal for pitch hubs */}
       <WelcomeModal
         isOpen={showWelcomeModal}
         onClose={handleWelcomeClose}

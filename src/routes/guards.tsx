@@ -4,12 +4,14 @@
  * Provides components to protect routes based on authentication and role.
  * - RequireAuth: Redirects to login if not authenticated
  * - RequireStaff: Blocks clients from staff routes
+ * - RequireAdmin: Blocks non-admin staff from admin routes (e.g., /leadership)
  * - RequireClient: Blocks staff from client routes
  * - RequireHubAccess: Verifies user has access to specific hub
  */
 
 import { Navigate, useLocation, useParams } from "react-router-dom";
 import { useCurrentUser, useHubAccess } from "@/hooks";
+import { hasAdminAccess } from "@/types";
 
 interface GuardProps {
   children: React.ReactNode;
@@ -90,7 +92,37 @@ export function RequireStaff({ children }: GuardProps) {
 }
 
 /**
- * RequireClient - Block staff from client routes (for testing/demo separation)
+ * RequireAdmin - Block non-admin staff from admin routes
+ *
+ * Policy: Leadership views require staff role + admin permissions.
+ * Non-admin staff are shown access denied; clients are redirected to login.
+ */
+export function RequireAdmin({ children }: GuardProps) {
+  const { data: authData, isLoading } = useCurrentUser();
+
+  if (isLoading) {
+    return <AuthLoading />;
+  }
+
+  if (!authData) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!hasAdminAccess(authData.user)) {
+    return (
+      <AccessDenied message="Leadership views require admin permissions. Contact your administrator if you believe you should have access." />
+    );
+  }
+
+  return <>{children}</>;
+}
+
+/**
+ * RequireClient - Block staff from client routes
+ *
+ * Policy: Staff cannot access client portal routes directly.
+ * They use the staff "Preview Portal" feature in HubDetail instead.
+ * This ensures clean separation between staff and client experiences.
  */
 export function RequireClient({ children }: GuardProps) {
   const { data: authData, isLoading } = useCurrentUser();
@@ -104,7 +136,7 @@ export function RequireClient({ children }: GuardProps) {
   }
 
   if (authData.user.role !== "client") {
-    // Staff can view client portal for preview, so just redirect to hub list
+    // Staff attempting to access client routes are redirected to hub list
     return <Navigate to="/hubs" replace />;
   }
 

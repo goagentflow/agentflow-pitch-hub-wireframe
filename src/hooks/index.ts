@@ -32,6 +32,7 @@ export {
   useUpdateHubNotes,
   useUpdatePortalConfig,
   usePublishPortal,
+  useConvertToClientHub,
 } from "./use-hubs";
 
 // Proposal hooks
@@ -134,4 +135,71 @@ export {
   useActivityEvents,
   useLogEvent,
   useTrackEngagement,
+  useLogLeadershipEvent,
+  useTrackLeadershipView,
 } from "./use-activity";
+
+// ============================================================================
+// Phase 2: Client Hub Hooks
+// ============================================================================
+
+// Project hooks
+export {
+  projectKeys,
+  useProjects,
+  useProject,
+  useCreateProject,
+  useUpdateProject,
+  useDeleteProject,
+  useCreateMilestone,
+  useUpdateMilestone,
+  useDeleteMilestone,
+} from "./use-projects";
+
+// Decision Queue hooks
+export {
+  decisionKeys,
+  useDecisions,
+  useDecision,
+  useCreateDecision,
+  useUpdateDecision,
+} from "./use-decisions";
+
+// Client Intelligence hooks (Instant Answers, Meeting Intelligence, Performance, History)
+export {
+  instantAnswerKeys,
+  meetingIntelligenceKeys,
+  performanceKeys,
+  historyKeys,
+  useCreateInstantAnswer,
+  useInstantAnswer,
+  useRecentInstantAnswers,
+  useGenerateMeetingPrep,
+  useMeetingPrep,
+  useGenerateMeetingFollowUp,
+  useMeetingFollowUp,
+  useGeneratePerformanceNarrative,
+  usePerformanceNarrative,
+  useLatestPerformanceNarrative,
+  useHistoryEvents,
+  useRiskAlerts,
+  useAcknowledgeRiskAlert,
+} from "./use-client-intelligence";
+
+// Relationship Intelligence hooks
+export {
+  relationshipKeys,
+  useRelationshipHealth,
+  useExpansionOpportunities,
+  useUpdateExpansionOpportunity,
+} from "./use-relationship-intelligence";
+
+// Leadership Portfolio hooks (admin-only)
+export {
+  leadershipKeys,
+  usePortfolioOverview,
+  usePortfolioClients,
+  useAtRiskClients,
+  useExpansionCandidates,
+  useRefreshPortfolioMetrics,
+} from "./use-leadership";

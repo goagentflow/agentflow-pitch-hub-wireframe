@@ -9,21 +9,28 @@ import { ClientMessagesSection } from "@/components/ClientMessagesSection";
 import { ClientMeetingsSection } from "@/components/ClientMeetingsSection";
 import { ClientQuestionnaireSection } from "@/components/ClientQuestionnaireSection";
 import { ClientPeopleSection } from "@/components/ClientPeopleSection";
+// Phase 5: Client-facing components
+import { ClientInstantAnswers } from "@/components/client-instant-answers";
+import { ClientDecisionQueue } from "@/components/client-decision-queue";
+import { ClientPerformance } from "@/components/client-performance";
+import { ClientHistory } from "@/components/client-history";
 import { HubProvider } from "@/contexts/hub-context";
-import { useCurrentUser } from "@/hooks";
+import { useCurrentUser, useHub } from "@/hooks";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 const PortalDetail = () => {
   const { hubId } = useParams<{ hubId: string }>();
   const { data: authData, isLoading, isFetching } = useCurrentUser();
+  const { data: hub, isLoading: hubLoading } = useHub(hubId || "");
 
   // Verify user has access to this hub
   const hubAccess = authData?.hubAccess?.find((h) => h.hubId === hubId);
   const hubName = hubAccess?.hubName || "Your AgentFlow Hub";
+  const hubType = hub?.hubType || "pitch";
 
   // Show loading state while auth data is being fetched
-  if (isLoading || (isFetching && !authData)) {
+  if (isLoading || hubLoading || (isFetching && !authData)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--gradient-blue))]" />
@@ -76,16 +83,26 @@ const PortalDetail = () => {
 
   return (
     <HubProvider hubId={hubId}>
-      <ClientHubLayout hubName={hubName} viewMode="client">
+      <ClientHubLayout hubName={hubName} hubType={hubType} viewMode="client">
         <Routes>
+          {/* Shared routes */}
           <Route path="overview" element={<ClientOverviewSection />} />
-          <Route path="proposal" element={<ClientProposalSection />} />
-          <Route path="videos" element={<ClientVideosSection />} />
           <Route path="documents" element={<ClientDocumentsSection />} />
           <Route path="messages" element={<ClientMessagesSection />} />
+
+          {/* Pitch hub routes */}
+          <Route path="proposal" element={<ClientProposalSection />} />
+          <Route path="videos" element={<ClientVideosSection />} />
           <Route path="meetings" element={<ClientMeetingsSection />} />
           <Route path="questionnaire" element={<ClientQuestionnaireSection />} />
           <Route path="people" element={<ClientPeopleSection />} />
+
+          {/* Phase 5: Client hub routes */}
+          <Route path="instant-answers" element={<ClientInstantAnswers hubId={hubId} />} />
+          <Route path="decisions" element={<ClientDecisionQueue hubId={hubId} />} />
+          <Route path="performance" element={<ClientPerformance hubId={hubId} />} />
+          <Route path="history" element={<ClientHistory hubId={hubId} />} />
+
           <Route path="/" element={<Navigate to="overview" replace />} />
         </Routes>
       </ClientHubLayout>

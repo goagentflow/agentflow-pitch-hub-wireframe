@@ -158,6 +158,7 @@ export { EventType } from "./activity";
 export type {
   ActivityEvent,
   LogEventRequest,
+  LeadershipLogEventRequest,
   EventMetadata,
   HubViewedMetadata,
   ProposalViewedMetadata,
@@ -173,6 +174,7 @@ export type {
   QuestionnaireCompletedMetadata,
   ShareSentMetadata,
   ShareAcceptedMetadata,
+  LeadershipAccessedMetadata,
   ActivityFeedItem,
   ActivityType,
 } from "./activity";

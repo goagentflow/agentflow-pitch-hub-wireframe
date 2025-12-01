@@ -27,6 +27,9 @@ import {
   getPortalConfig,
   updatePortalConfig,
   publishPortal,
+  convertToClientHub,
+  type ConvertHubRequest,
+  type ConvertHubResponse,
 } from "@/services";
 import { serializeParams } from "@/lib/query-keys";
 
@@ -164,6 +167,26 @@ export function usePublishPortal(hubId: string) {
     mutationFn: () => publishPortal(hubId),
     onSuccess: (config) => {
       queryClient.setQueryData(hubKeys.portalConfig(hubId), config);
+    },
+  });
+}
+
+/**
+ * Hook to convert pitch hub to client hub
+ * Atomic, idempotent operation with optional first project creation
+ */
+export function useConvertToClientHub(hubId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation<ConvertHubResponse, Error, ConvertHubRequest | undefined>({
+    mutationFn: (data) => convertToClientHub(hubId, data),
+    onSuccess: ({ hub }) => {
+      // Update hub detail cache
+      queryClient.setQueryData(hubKeys.detail(hubId), hub);
+      // Invalidate lists to reflect type change
+      queryClient.invalidateQueries({ queryKey: hubKeys.lists() });
+      // Invalidate overview for updated state
+      queryClient.invalidateQueries({ queryKey: hubKeys.overview(hubId) });
     },
   });
 }

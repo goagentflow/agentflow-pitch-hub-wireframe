@@ -1,7 +1,19 @@
-import { Home, FileText, Play, Folder, Mail, Calendar, ClipboardList, Globe } from "lucide-react";
+import {
+  Home,
+  FileText,
+  Play,
+  Folder,
+  Mail,
+  Calendar,
+  Globe,
+  FolderKanban,
+  ClipboardCheck,
+  BrainCircuit,
+} from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useHubId } from "@/contexts/hub-context";
+import { useHub } from "@/hooks";
 
 import {
   Sidebar,
@@ -14,7 +26,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const navItems = [
+// Navigation for pitch hubs (prospecting stage) - max 7 items
+const pitchNavItems = [
   { title: "Overview", path: "overview", icon: Home },
   { title: "Client Portal", path: "client-portal", icon: Globe },
   { title: "Proposal", path: "proposal", icon: FileText },
@@ -22,7 +35,18 @@ const navItems = [
   { title: "Documents", path: "documents", icon: Folder },
   { title: "Messages", path: "messages", icon: Mail },
   { title: "Meetings", path: "meetings", icon: Calendar },
-  { title: "Questionnaire", path: "questionnaire", icon: ClipboardList },
+];
+
+// Navigation for client hubs (active client relationship) - max 7 items
+// Order: core tasks first, intelligence last
+const clientNavItems = [
+  { title: "Overview", path: "overview", icon: Home },
+  { title: "Projects", path: "projects", icon: FolderKanban },
+  { title: "Decisions", path: "decisions", icon: ClipboardCheck },
+  { title: "Documents", path: "documents", icon: Folder },
+  { title: "Messages", path: "messages", icon: Mail },
+  { title: "Meetings", path: "meetings", icon: Calendar },
+  { title: "Intelligence", path: "intelligence", icon: BrainCircuit },
 ];
 
 export function HubSidebar() {
@@ -30,6 +54,10 @@ export function HubSidebar() {
   const location = useLocation();
   const hubId = useHubId();
   const currentPath = location.pathname;
+  const { data: hub } = useHub(hubId);
+
+  // Select navigation items based on hub type
+  const navItems = hub?.hubType === "client" ? clientNavItems : pitchNavItems;
 
   return (
     <Sidebar className="border-r border-border/50 pt-16" collapsible="icon">

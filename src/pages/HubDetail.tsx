@@ -7,6 +7,10 @@ import { DocumentsSection } from "@/components/DocumentsSection";
 import { MessagesSection } from "@/components/MessagesSection";
 import { MeetingsSection } from "@/components/MeetingsSection";
 import { QuestionnaireSection } from "@/components/QuestionnaireSection";
+// Client hub components
+import { ProjectList } from "@/components/projects/ProjectList";
+import { StaffDecisionsSection } from "@/components/StaffDecisionsSection";
+import { IntelligenceSection } from "@/components/IntelligenceSection";
 import { useLocation, useParams, Navigate } from "react-router-dom";
 import { HubProvider } from "@/contexts/hub-context";
 
@@ -21,13 +25,19 @@ export default function HubDetail() {
   }
 
   const renderSection = () => {
+    // Pitch hub sections
     if (path.includes('/client-portal')) return <ClientPortalSection />;
     if (path.includes('/proposal')) return <ProposalSection />;
     if (path.includes('/videos')) return <VideosSection />;
+    if (path.includes('/questionnaire')) return <QuestionnaireSection />;
+    // Client hub sections
+    if (path.includes('/projects')) return <ProjectList hubId={hubId} />;
+    if (path.includes('/decisions')) return <StaffDecisionsSection />;
+    if (path.includes('/intelligence')) return <IntelligenceSection />;
+    // Shared sections (both hub types)
     if (path.includes('/documents')) return <DocumentsSection />;
     if (path.includes('/messages')) return <MessagesSection />;
     if (path.includes('/meetings')) return <MeetingsSection />;
-    if (path.includes('/questionnaire')) return <QuestionnaireSection />;
     return <OverviewSection />;
   };
 

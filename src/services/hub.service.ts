@@ -2,6 +2,7 @@
  * Hub service
  *
  * Operations for hub list and hub management.
+ * Note: Conversion operations are in hub-conversion.service.ts
  */
 
 import type {
@@ -14,11 +15,17 @@ import type {
   PaginatedList,
   PaginationParams,
   ActivityFeedItem,
-  Project,
 } from "@/types";
 import { api, isMockApiEnabled, simulateDelay } from "./api";
-import { mockProjects } from "./mock-data-client-hub";
-import { mockHubs, mockHubOverview, mockPortalConfig, mockActivityFeed } from "./mock-data";
+import { mockHubs, mockHubOverview, mockPortalConfig, mockActivityFeed, mockActivityByHub } from "./mock-data";
+
+// Re-export conversion functions for backwards compatibility
+export {
+  convertToClientHub,
+  rollbackConversion,
+  type ConvertHubRequest,
+  type ConvertHubResponse,
+} from "./hub-conversion.service";
 
 /**
  * Get paginated list of hubs
@@ -39,11 +46,17 @@ export async function getHubs(params?: PaginationParams): Promise<PaginatedList<
       );
     }
 
-    // Apply status filter
+    // Apply filters (supports multiple filters comma-separated)
     if (params?.filter) {
-      const [field, value] = params.filter.split(":");
-      if (field === "status" && value) {
-        filtered = filtered.filter((h) => h.status === value);
+      const filters = params.filter.split(",");
+      for (const f of filters) {
+        const [field, value] = f.split(":");
+        if (field === "status" && value) {
+          filtered = filtered.filter((h) => h.status === value);
+        }
+        if (field === "hubType" && value) {
+          filtered = filtered.filter((h) => h.hubType === value);
+        }
       }
     }
 
@@ -152,7 +165,15 @@ export async function updateHub(hubId: string, data: UpdateHubRequest): Promise<
 export async function getHubOverview(hubId: string): Promise<HubOverview> {
   if (isMockApiEnabled()) {
     await simulateDelay(300);
-    return mockHubOverview;
+    // Find the correct hub by ID
+    const hub = mockHubs.find((h) => h.id === hubId);
+    if (!hub) throw new Error("Hub not found");
+
+    // Return overview with the correct hub
+    return {
+      ...mockHubOverview,
+      hub,
+    };
   }
 
   return api.get<HubOverview>(`/hubs/${hubId}/overview`);
@@ -180,9 +201,11 @@ export async function getHubActivity(
 ): Promise<PaginatedList<ActivityFeedItem>> {
   if (isMockApiEnabled()) {
     await simulateDelay(200);
+    // Use hub-specific activity or fall back to default
+    const activity = mockActivityByHub[hubId] || mockActivityFeed;
     return {
-      items: mockActivityFeed,
-      pagination: { page: 1, pageSize: 20, totalItems: mockActivityFeed.length, totalPages: 1 },
+      items: activity,
+      pagination: { page: 1, pageSize: 20, totalItems: activity.length, totalPages: 1 },
     };
   }
 
@@ -232,139 +255,4 @@ export async function publishPortal(hubId: string): Promise<PortalConfig> {
   }
 
   return api.post<PortalConfig>(`/hubs/${hubId}/publish`);
-}
-
-// ============================================================================
-// Hub Conversion (Pitch → Client)
-// ============================================================================
-
-export interface ConvertHubResponse {
-  hub: Hub;
-  archiveSummary: {
-    proposalArchived: boolean;
-    proposalDocumentId?: string;
-    questionnaireArchived: boolean;
-    questionnaireHistoryId?: string;
-  };
-  project?: Project;
-  alreadyConverted: boolean;
-  audit: {
-    convertedBy: string;
-    convertedAt: string;
-  };
-}
-
-export interface ConvertHubRequest {
-  initialProjectName?: string;
-}
-
-/**
- * Convert a pitch hub to a client hub
- * Atomic operation: archives proposal, handles questionnaire, creates optional first project
- * Idempotent: calling twice returns same result without side effects
- */
-export async function convertToClientHub(
-  hubId: string,
-  data?: ConvertHubRequest
-): Promise<ConvertHubResponse> {
-  if (isMockApiEnabled()) {
-    await simulateDelay(800);
-
-    const hub = mockHubs.find((h) => h.id === hubId);
-    if (!hub) throw new Error("Hub not found");
-
-    const now = new Date().toISOString();
-    const userId = "user-staff-1";
-
-    // Check if already converted (idempotent)
-    if (hub.hubType === "client") {
-      return {
-        hub,
-        archiveSummary: {
-          proposalArchived: true,
-          proposalDocumentId: `doc-archived-${hubId}`,
-          questionnaireArchived: true,
-          questionnaireHistoryId: `history-questionnaire-${hubId}`,
-        },
-        alreadyConverted: true,
-        audit: {
-          convertedBy: hub.convertedBy || userId,
-          convertedAt: hub.convertedAt || now,
-        },
-      };
-    }
-
-    // Perform conversion
-    hub.hubType = "client";
-    hub.convertedAt = now;
-    hub.convertedBy = userId;
-    hub.updatedAt = now;
-
-    let project: Project | undefined;
-
-    // Create initial project if name provided
-    if (data?.initialProjectName) {
-      project = {
-        id: `project-${Date.now()}`,
-        hubId,
-        name: data.initialProjectName,
-        description: null,
-        status: "active",
-        startDate: now,
-        targetEndDate: null,
-        lead: userId,
-        leadName: "Hamish Nicklin",
-        milestones: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-      mockProjects.push(project);
-    }
-
-    return {
-      hub,
-      archiveSummary: {
-        proposalArchived: true,
-        proposalDocumentId: `doc-archived-${hubId}`,
-        questionnaireArchived: true,
-        questionnaireHistoryId: `history-questionnaire-${hubId}`,
-      },
-      project,
-      alreadyConverted: false,
-      audit: {
-        convertedBy: userId,
-        convertedAt: now,
-      },
-    };
-  }
-
-  return api.post<ConvertHubResponse>(`/hubs/${hubId}/convert`, data);
-}
-
-/**
- * Rollback hub conversion (INTERNAL USE ONLY - requires admin)
- * NOT for production use - early-phase recovery only
- */
-export async function rollbackConversion(hubId: string): Promise<Hub> {
-  if (isMockApiEnabled()) {
-    await simulateDelay(500);
-
-    const hub = mockHubs.find((h) => h.id === hubId);
-    if (!hub) throw new Error("Hub not found");
-
-    // Only rollback if actually a client hub
-    if (hub.hubType !== "client") {
-      throw new Error("Hub is not a client hub");
-    }
-
-    // Reverse conversion
-    hub.hubType = "pitch";
-    hub.convertedAt = undefined;
-    hub.convertedBy = undefined;
-    hub.updatedAt = new Date().toISOString();
-
-    return hub;
-  }
-
-  return api.post<Hub>(`/hubs/${hubId}/convert/rollback`);
 }

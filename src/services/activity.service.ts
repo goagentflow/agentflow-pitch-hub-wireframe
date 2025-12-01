@@ -5,7 +5,13 @@
  * Events use strict enum types for reliable analytics.
  */
 
-import type { LogEventRequest, ActivityEvent, PaginatedList, PaginationParams } from "@/types";
+import type {
+  LogEventRequest,
+  LeadershipLogEventRequest,
+  ActivityEvent,
+  PaginatedList,
+  PaginationParams,
+} from "@/types";
 import { api, isMockApiEnabled, simulateDelay } from "./api";
 
 // In-memory event store for mock mode
@@ -44,6 +50,25 @@ export async function logEvent(hubId: string, event: LogEventRequest): Promise<v
   }
 
   return api.post(`/hubs/${hubId}/events`, event);
+}
+
+/**
+ * Log a leadership event (not hub-scoped)
+ * Used for tracking admin portfolio view usage
+ */
+export async function logLeadershipEvent(event: LeadershipLogEventRequest): Promise<void> {
+  if (isMockApiEnabled()) {
+    await simulateDelay(50);
+
+    // Log to console in development for debugging
+    if (import.meta.env.DEV) {
+      console.log("[Analytics:Leadership]", event.eventType, event.metadata);
+    }
+
+    return;
+  }
+
+  return api.post("/leadership/events", event);
 }
 
 /**

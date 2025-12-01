@@ -8,12 +8,13 @@
 
 import type { User, AuthMeResponse, HubAccessCheckResponse } from "@/types";
 import { api, isMockApiEnabled, simulateDelay } from "./api";
-import { mockStaffUser, mockClientUser, mockHubs } from "./mock-data";
+import { mockStaffUser, mockClientUser, mockClientHubUser, mockHubs } from "./mock-data";
 
 // Demo credentials for wireframe testing
 const DEMO_CREDENTIALS = {
   staff: { email: "hamish@goagentflow.com", password: "password123" },
   client: { email: "sarah@whitmorelaw.co.uk", password: "password123" },
+  clientHub: { email: "alex@meridiandigital.co", password: "password123" },
 };
 
 /**
@@ -32,6 +33,9 @@ export async function loginWithCredentials(
     }
     if (email === DEMO_CREDENTIALS.client.email && password === DEMO_CREDENTIALS.client.password) {
       return mockClientUser;
+    }
+    if (email === DEMO_CREDENTIALS.clientHub.email && password === DEMO_CREDENTIALS.clientHub.password) {
+      return mockClientHubUser;
     }
     return null;
   }
@@ -56,7 +60,11 @@ export async function getCurrentUser(): Promise<AuthMeResponse | null> {
       return null;
     }
 
-    const user = storedRole === "staff" ? mockStaffUser : mockClientUser;
+    // Determine which user based on stored email
+    let user = mockStaffUser;
+    if (storedRole === "client") {
+      user = storedEmail === mockClientHubUser.email ? mockClientHubUser : mockClientUser;
+    }
     const hubAccess = mockHubs
       .filter((h) => storedRole === "staff" || h.clientDomain === user.domain)
       .map((h) => ({

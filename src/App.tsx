@@ -9,8 +9,9 @@ import Login from "./pages/Login";
 import HubList from "./pages/HubList";
 import HubDetail from "./pages/HubDetail";
 import PortalDetail from "./pages/PortalDetail";
+import LeadershipPortfolio from "./pages/LeadershipPortfolio";
 import NotFound from "./pages/NotFound";
-import { RequireStaff, RequireClient } from "./routes/guards";
+import { RequireStaff, RequireAdmin, RequireClient } from "./routes/guards";
 import { setUnauthorizedHandler } from "./services/api";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,14 @@ const App = () => (
               <RequireClient>
                 <PortalDetail />
               </RequireClient>
+            }
+          />
+          <Route
+            path="/leadership"
+            element={
+              <RequireAdmin>
+                <LeadershipPortfolio />
+              </RequireAdmin>
             }
           />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

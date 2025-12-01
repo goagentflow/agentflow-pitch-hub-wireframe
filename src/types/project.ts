@@ -11,7 +11,7 @@ import type { EntityId, ISODateString } from "./common";
 export type ProjectStatus = "active" | "on_hold" | "completed" | "cancelled";
 
 // Milestone status
-export type MilestoneStatus = "pending" | "in_progress" | "completed" | "missed";
+export type MilestoneStatus = "not_started" | "in_progress" | "completed" | "missed";
 
 // Project entity
 export interface Project {

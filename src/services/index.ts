@@ -123,6 +123,7 @@ export {
 // Activity service
 export {
   logEvent,
+  logLeadershipEvent,
   getEvents,
   getSessionEvents,
   clearSessionEvents,
@@ -144,7 +145,7 @@ export {
   deleteMilestone,
 } from "./project.service";
 
-// Client Intelligence service
+// Client Intelligence services (split for maintainability)
 export {
   createInstantAnswer,
   getInstantAnswer,
@@ -163,16 +164,21 @@ export {
   getHistoryEvents,
   getRiskAlerts,
   acknowledgeRiskAlert,
-} from "./client-intelligence.service";
+} from "./client-intelligence";
+export type { DecisionFilterParams } from "./client-intelligence";
 
 // Relationship Intelligence service
 export {
   getRelationshipHealth,
   getExpansionOpportunities,
   updateExpansionOpportunity,
+} from "./relationship-intelligence.service";
+
+// Leadership Portfolio service (admin-only)
+export {
   getPortfolioOverview,
   getPortfolioClients,
   getAtRiskClients,
   getExpansionCandidates,
   refreshPortfolioMetrics,
-} from "./relationship-intelligence.service";
+} from "./leadership.service";

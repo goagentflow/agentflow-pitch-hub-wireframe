@@ -18,30 +18,65 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { NavLink } from "./NavLink";
-import { Home, FileText, Play, FolderOpen, MessageSquare, Calendar, ClipboardList, Users } from "lucide-react";
+import {
+  Home,
+  FileText,
+  Play,
+  FolderOpen,
+  MessageSquare,
+  Calendar,
+  ClipboardList,
+  Users,
+  Sparkles,
+  ClipboardCheck,
+  BarChart3,
+  History,
+} from "lucide-react";
 import { useCurrentUser, useLogout } from "@/hooks";
 import { useHubId } from "@/contexts/hub-context";
+import type { HubType } from "@/types";
 
 interface ClientHubLayoutProps {
   children: React.ReactNode;
   hubName?: string;
+  hubType?: HubType;
   viewMode?: "internal" | "client";
 }
 
-const clientNavItems = [
+// Max visible nav items
+const MAX_CLIENT_NAV_ITEMS = 8;
+
+// Pitch hub nav items (existing pitch functionality)
+const pitchHubNavItems = [
   { title: "Overview", path: "overview", icon: Home },
   { title: "Proposal", path: "proposal", icon: FileText },
   { title: "Videos", path: "videos", icon: Play },
   { title: "Documents", path: "documents", icon: FolderOpen },
-  { title: "Messages", path: "messages", icon: MessageSquare },
   { title: "Meetings", path: "meetings", icon: Calendar },
   { title: "Questionnaire", path: "questionnaire", icon: ClipboardList },
-  { title: "People", path: "people", icon: Users },
 ];
 
-function ClientSidebar() {
+// Client hub nav items - includes core collaboration (Messages, Meetings) + Phase 5 features
+const clientHubNavItems = [
+  { title: "Overview", path: "overview", icon: Home },
+  { title: "Messages", path: "messages", icon: MessageSquare },
+  { title: "Meetings", path: "meetings", icon: Calendar },
+  { title: "Documents", path: "documents", icon: FolderOpen },
+  { title: "Decisions", path: "decisions", icon: ClipboardCheck },
+  { title: "Performance", path: "performance", icon: BarChart3 },
+  { title: "Instant Answers", path: "instant-answers", icon: Sparkles },
+  { title: "History", path: "history", icon: History },
+];
+
+function ClientSidebar({ hubType = "pitch" }: { hubType?: HubType }) {
   const hubId = useHubId();
   const location = useLocation();
+
+  // Select nav items based on hub type
+  const navItems = hubType === "client" ? clientHubNavItems : pitchHubNavItems;
+
+  // Enforce max nav items limit (silently truncate - validated at design time)
+  const visibleNavItems = navItems.slice(0, MAX_CLIENT_NAV_ITEMS);
 
   return (
     <Sidebar className="border-r bg-[hsl(var(--deep-navy))] pt-16" collapsible="icon">
@@ -49,7 +84,7 @@ function ClientSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {clientNavItems.map((item) => {
+              {visibleNavItems.map((item) => {
                 const url = `/portal/${hubId}/${item.path}`;
                 const isActive = location.pathname.startsWith(url) ||
                   (item.path === "overview" && location.pathname === `/portal/${hubId}`);
@@ -80,6 +115,7 @@ function ClientSidebar() {
 export function ClientHubLayout({
   children,
   hubName = "Your AgentFlow Hub",
+  hubType = "pitch",
   viewMode = "client"
 }: ClientHubLayoutProps) {
   const navigate = useNavigate();
@@ -96,6 +132,12 @@ export function ClientHubLayout({
     logout();
   };
 
+  // Badge styling based on hub type (visual differentiation per spec Section 4.4)
+  const badgeText = hubType === "client" ? "Client Hub" : "Client View";
+  const badgeClass = hubType === "client"
+    ? "bg-[hsl(var(--sage-green))] text-white"
+    : "bg-[hsl(var(--gradient-blue))] text-white";
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full flex-col">
@@ -110,14 +152,14 @@ export function ClientHubLayout({
               onClick={() => navigate(`/portal/${hubId}/overview`)}
             />
           </div>
-          
+
           <h1 className="text-lg md:text-xl font-semibold text-[hsl(var(--bold-royal-blue))] absolute left-1/2 transform -translate-x-1/2">
             {hubName}
           </h1>
-          
+
           <div className="flex items-center gap-3">
-            <Badge className="bg-[hsl(var(--gradient-blue))] text-white">
-              Client View
+            <Badge className={badgeClass}>
+              {badgeText}
             </Badge>
             
             <DropdownMenu>
@@ -142,7 +184,7 @@ export function ClientHubLayout({
 
         {/* Main layout with sidebar */}
         <div className="flex flex-1 w-full">
-          <ClientSidebar />
+          <ClientSidebar hubType={hubType} />
           
           {/* Main content */}
           <main className="flex-1 bg-[hsl(var(--warm-cream))] p-6 md:p-8 overflow-auto">

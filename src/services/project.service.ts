@@ -16,7 +16,7 @@ import type {
   PaginationParams,
   ProjectFilterParams,
 } from "@/types";
-import { api, isMockApiEnabled, simulateDelay } from "./api";
+import { api, isMockApiEnabled, simulateDelay, ApiRequestError } from "./api";
 import { mockProjects } from "./mock-data-client-hub";
 
 /**
@@ -65,7 +65,12 @@ export async function getProject(hubId: string, projectId: string): Promise<Proj
   if (isMockApiEnabled()) {
     await simulateDelay(200);
     const project = mockProjects.find((p) => p.id === projectId && p.hubId === hubId);
-    if (!project) throw new Error("Project not found");
+    if (!project) {
+      throw new ApiRequestError(
+        { code: "NOT_FOUND", message: "Project not found" },
+        404
+      );
+    }
     return project;
   }
 
@@ -86,15 +91,16 @@ export async function createProject(
       id: `project-${Date.now()}`,
       hubId,
       name: data.name,
-      description: data.description || null,
+      description: data.description,
       status: data.status || "active",
       startDate: data.startDate || new Date().toISOString(),
-      targetEndDate: data.targetEndDate || null,
-      lead: data.lead || null,
-      leadName: data.lead ? "Hamish Nicklin" : null, // Mock name lookup
+      targetEndDate: data.targetEndDate,
+      lead: data.lead,
+      leadName: data.lead ? "Hamish Nicklin" : undefined, // Mock name lookup
       milestones: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      createdBy: "user-staff-1",
     };
 
     mockProjects.push(newProject);
@@ -116,7 +122,12 @@ export async function updateProject(
     await simulateDelay(300);
 
     const index = mockProjects.findIndex((p) => p.id === projectId && p.hubId === hubId);
-    if (index === -1) throw new Error("Project not found");
+    if (index === -1) {
+      throw new ApiRequestError(
+        { code: "NOT_FOUND", message: "Project not found" },
+        404
+      );
+    }
 
     mockProjects[index] = {
       ...mockProjects[index],
@@ -159,14 +170,19 @@ export async function createMilestone(
     await simulateDelay(300);
 
     const project = mockProjects.find((p) => p.id === projectId && p.hubId === hubId);
-    if (!project) throw new Error("Project not found");
+    if (!project) {
+      throw new ApiRequestError(
+        { code: "NOT_FOUND", message: "Project not found" },
+        404
+      );
+    }
 
     const newMilestone: ProjectMilestone = {
       id: `ms-${Date.now()}`,
       name: data.name,
       targetDate: data.targetDate,
-      status: data.status || "not_started",
-      description: data.description || null,
+      status: "not_started",
+      description: data.description,
     };
 
     project.milestones.push(newMilestone);
@@ -194,10 +210,20 @@ export async function updateMilestone(
     await simulateDelay(300);
 
     const project = mockProjects.find((p) => p.id === projectId && p.hubId === hubId);
-    if (!project) throw new Error("Project not found");
+    if (!project) {
+      throw new ApiRequestError(
+        { code: "NOT_FOUND", message: "Project not found" },
+        404
+      );
+    }
 
     const msIndex = project.milestones.findIndex((m) => m.id === milestoneId);
-    if (msIndex === -1) throw new Error("Milestone not found");
+    if (msIndex === -1) {
+      throw new ApiRequestError(
+        { code: "NOT_FOUND", message: "Milestone not found" },
+        404
+      );
+    }
 
     project.milestones[msIndex] = {
       ...project.milestones[msIndex],
@@ -226,7 +252,12 @@ export async function deleteMilestone(
     await simulateDelay(300);
 
     const project = mockProjects.find((p) => p.id === projectId && p.hubId === hubId);
-    if (!project) throw new Error("Project not found");
+    if (!project) {
+      throw new ApiRequestError(
+        { code: "NOT_FOUND", message: "Project not found" },
+        404
+      );
+    }
 
     const msIndex = project.milestones.findIndex((m) => m.id === milestoneId);
     if (msIndex !== -1) {

@@ -2,9 +2,11 @@
 
 ## Product Vision & Technical Assumptions
 
-**November 2025**
+**November 2025** (Updated: Phase 2 Complete)
 
-*This document outlines the full product vision for AgentFlow Hubs, explains where the Pitch Hub v0.1 wireframes fit within that vision, and documents the technical assumptions for middleware development.*
+*This document outlines the full product vision for AgentFlow Hubs, explains the current implementation status, and documents the technical assumptions for middleware development.*
+
+> **Status Update:** Phase 2 (Client Hubs) is now implemented in the wireframe. See Section 2 for current scope.
 
 ---
 
@@ -44,42 +46,47 @@ All data — configuration, client information, captured communications, and der
 
 ---
 
-## 2. Where the Pitch Hub v0.1 Fits
+## 2. Current Implementation Scope
 
-### 2.1 Eating Our Own Dog Food
+### 2.1 Development Approach
 
-Before building the full platform, we are building a minimal Pitch Hub that AgentFlow will use to pitch its own services to prospective clients. This approach lets us experience the product as real users, validate the concept with actual prospects, and give Stephen a concrete use case for learning the Microsoft APIs.
+We are building AgentFlow Hubs iteratively, starting with features AgentFlow uses internally to pitch and serve clients. This approach lets us experience the product as real users, validate the concept with actual prospects and clients, and give Stephen concrete use cases for learning the Microsoft APIs.
 
-### 2.2 What v0.1 Includes
+### 2.2 What's Implemented (Wireframe Complete)
 
-The v0.1 wireframes cover a complete Pitch Hub with two user experiences:
+**Phase 1: Pitch Hubs** — Complete new business tool with:
+- Staff view for managing pitches (proposal, videos, documents, messages, meetings, questionnaire)
+- Client portal view for prospects
+- Engagement tracking and activity feeds
+- Member management with domain-restricted sharing
 
-**AgentFlow Staff View** — The internal workspace where Hamish and Stephen manage pitches, upload content, communicate with prospects, and track engagement.
+**Phase 2: Client Hubs** — Expansion for ongoing client relationships:
+- Hub conversion flow (pitch → client with celebration wizard)
+- Projects with milestones and artifact assignment
+- Decision Queue with state machine (open → in_review → approved/declined)
+- Client-facing features: Instant Answers, Performance, History
+- Staff intelligence: Relationship Health Dashboard, Expansion Radar
+- Leadership Portfolio views (admin-only aggregate metrics)
 
-**Client View** — What prospects see when they log into their hub: the proposal, videos, documents, messages, meetings, and questionnaires shared with them.
+### 2.3 What Remains for Future Phases
 
-### 2.3 What v0.1 Does NOT Include
+The following features from the full vision are deferred:
 
-The following features from the full vision are out of scope for v0.1:
-
-- Client Hubs (for ongoing client delivery)
-- Expansion Radar (upsell opportunity detection)
-- Relationship Health scoring
-- Client Assistant AI (natural language Q&A)
-- Leadership portfolio views
-- Performance visibility from external platforms
+- Real AI integration (currently mock responses for Instant Answers, Meeting Prep, Performance Narratives)
+- Performance data from external platforms (requires integrations)
 - Multi-tenant deployment
+- Advanced analytics and reporting
 
 ---
 
 ## 3. What the Wireframes Cover
 
-### 3.1 AgentFlow Staff Views
+### 3.1 AgentFlow Staff Views (Pitch Hub)
 
 | Page | Purpose |
 |------|---------|
 | **Login** | Microsoft SSO entry point |
-| **Hub List** | Dashboard showing all pitch hubs with status and last activity |
+| **Hub List** | Dashboard showing all hubs with status, type (pitch/client), and last activity |
 | **Hub Overview** | Workspace for managing a pitch: quick actions, activity feed, internal notes, engagement stats |
 | **Client Portal** | Curate what clients see: select hero content, toggle sections, manage client access, preview and publish |
 | **Videos** | Upload, record, and manage videos with tagging, visibility controls, and engagement tracking |
@@ -88,7 +95,18 @@ The following features from the full vision are out of scope for v0.1:
 | **Meetings** | Schedule meetings, manage agendas, access recordings and transcripts, generate AI summaries (auto and custom prompts) |
 | **Questionnaire** | Link Microsoft Forms, track responses, view analytics, share with clients |
 
-### 3.2 Client Views
+### 3.2 AgentFlow Staff Views (Client Hub — Phase 2)
+
+| Page | Purpose |
+|------|---------|
+| **Hub Overview** | Client relationship dashboard with projects, relationship health, expansion radar |
+| **Projects** | Create and manage multiple workstreams with milestones |
+| **Relationship Health** | AI-powered scoring (Strong/Stable/At Risk) with trend indicators and drivers |
+| **Expansion Radar** | Detected upsell/cross-sell opportunities with evidence |
+| **Conversion Wizard** | Multi-step flow to convert won pitch to client hub |
+| **Leadership Portfolio** | Admin-only cross-client view with health/expansion matrix |
+
+### 3.3 Client Portal Views (Pitch Hub)
 
 | Page | Purpose |
 |------|---------|
@@ -100,6 +118,19 @@ The following features from the full vision are out of scope for v0.1:
 | **Meetings** | View scheduled meetings, join calls, watch shared recordings, request new meetings with proposed times |
 | **Questionnaire** | Complete questionnaires shared with them, share with colleagues |
 | **People** | See who has access, invite colleagues from same domain with specific permissions |
+
+### 3.4 Client Portal Views (Client Hub — Phase 2)
+
+| Page | Purpose |
+|------|---------|
+| **Overview** | Decisions-first dashboard with project status, quick ask, upcoming meetings, recent messages |
+| **Decisions** | "Waiting on you" queue with approve/decline actions |
+| **Messages** | Same as pitch hub |
+| **Meetings** | Same as pitch hub, with past meeting history and AI summaries |
+| **Documents** | Contracts, SOWs, deliverables, brand guidelines |
+| **Performance** | AI-generated KPI narratives and summaries |
+| **Instant Answers** | AI Q&A interface with suggested questions |
+| **History** | Institutional memory timeline of relationship events |
 
 ---
 

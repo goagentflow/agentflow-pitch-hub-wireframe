@@ -52,15 +52,29 @@ Two user experiences:
 - Questionnaire (complete forms)
 - People (access management)
 
+## Phase 2: Client Hubs (Now Building)
+
+Phase 2 extends pitch hubs to ongoing client relationships. See `docs/PHASE_2_CLIENT_HUBS.md` for full specification.
+
+**Now implemented:**
+- Hub Conversion (pitch → client hub transition)
+- Projects (work stream organization)
+- Relationship Health Dashboard (AI-powered health scoring)
+- Expansion Radar (AI upsell/cross-sell detection)
+- Client Intelligence (Instant Answers, Meeting Prep, Performance Narratives)
+- Decision Queue (client decision tracking)
+- History & Alerts (institutional memory)
+- Leadership Portfolio View (admin-only aggregate views)
+
+**Hub Type Navigation:**
+- Pitch Hubs: Overview, Client Portal, Proposal, Videos, Documents, Messages, Meetings (7 items max)
+- Client Hubs: Overview, Projects, Documents, Messages, Meetings, Health, Expansion (7 items max)
+
 ## What We're NOT Building Yet
 
-- Client Hubs (ongoing client delivery) — v0.1 is pitch/new business only
-- Expansion Radar (AI upsell detection)
-- Relationship Health scoring
-- Client Assistant AI (natural language Q&A)
-- Leadership portfolio roll-up views
 - Real Microsoft Graph API integration (Stephen is building middleware separately)
 - Multi-tenant deployment
+- Full production security hardening
 
 ---
 

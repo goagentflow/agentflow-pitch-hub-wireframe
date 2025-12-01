@@ -4,11 +4,15 @@ A client pitch portal built on Microsoft 365. This is AgentFlow eating its own d
 
 ## What This Is
 
-**Wireframes only.** This front-end is a complete UI for the Pitch Hub, built in React/TypeScript. All buttons, forms, and interactions are visual placeholders. There is no middleware connection yet — that's being built separately by Stephen.
+**Phase 2: Client Hubs.** This front-end now includes both Pitch Hubs (prospecting) and Client Hubs (active client relationships). Built in React/TypeScript with mock API layer.
 
-The wireframes cover two user experiences:
-- **AgentFlow Staff View** — where we manage pitches, upload content, and track engagement
-- **Client View** — what prospects see when they log into their hub
+The application covers two hub types:
+- **Pitch Hubs** — Managing new business pitches (proposals, videos, documents, meetings)
+- **Client Hubs** — Ongoing client relationships (projects, relationship health, expansion opportunities)
+
+Each hub type has two user experiences:
+- **AgentFlow Staff View** — Manage content, track engagement, view AI insights
+- **Client View** — Access shared content and collaborate
 
 ## Where This Fits
 
@@ -94,17 +98,31 @@ npm run dev
 
 **Custom domain:** Project → Settings → Domains → Connect Domain. [Docs](https://docs.lovable.dev/features/custom-domain#custom-domain)
 
+## Current Status
+
+**Phase 2 Complete.** Client Hubs functionality implemented including:
+- Hub conversion (pitch → client)
+- Projects with milestones
+- Relationship Health Dashboard
+- Expansion Radar
+- Client Intelligence (Instant Answers, Meeting Prep)
+- Decision Queue
+- History & Alerts
+- Leadership Portfolio (admin-only)
+
 ## What's Next
 
-1. **Hamish:** Complete wireframes for all sections
-2. **Stephen:** Research and prototype Microsoft Graph API integrations
-3. **Together:** Connect front-end to middleware, test with real M365 tenant
+1. **Stephen:** Complete Microsoft Graph API middleware
+2. **Together:** Connect front-end to middleware, test with real M365 tenant
+3. **Production:** Security hardening, multi-tenant deployment
 
 ## Key Documents
 
 - [VISION_AND_ASSUMPTIONS.md](./VISION_AND_ASSUMPTIONS.md) — Full product vision and middleware assumptions
+- [docs/PHASE_2_CLIENT_HUBS.md](./docs/PHASE_2_CLIENT_HUBS.md) — Phase 2 Client Hubs specification
+- [docs/API_SPECIFICATION.md](./docs/API_SPECIFICATION.md) — Complete API contract for middleware
 - `.cursorrules` — Context for AI coding assistants
 
 ---
 
-*This is a wireframe prototype. No real data, no real authentication, no real API calls — yet.*
+*Phase 2 implementation complete. Mock API layer in place, ready for middleware integration.*

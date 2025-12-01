@@ -6,9 +6,16 @@
 
 import { useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { LogEventRequest, ActivityEvent, PaginatedList, PaginationParams } from "@/types";
+import type {
+  LogEventRequest,
+  LeadershipLogEventRequest,
+  ActivityEvent,
+  PaginatedList,
+  PaginationParams,
+  LeadershipAccessedMetadata,
+} from "@/types";
 import { EventType } from "@/types";
-import { logEvent, getEvents } from "@/services";
+import { logEvent, logLeadershipEvent, getEvents } from "@/services";
 import { serializeParams } from "@/lib/query-keys";
 
 // Query keys - use serialized params for stable cache keys
@@ -125,4 +132,29 @@ export function useTrackEngagement(hubId: string) {
     trackMessageSent,
     trackQuestionnaireCompleted,
   };
+}
+
+/**
+ * Hook to log leadership events (not hub-scoped)
+ */
+export function useLogLeadershipEvent() {
+  return useMutation<void, Error, LeadershipLogEventRequest>({
+    mutationFn: logLeadershipEvent,
+  });
+}
+
+/**
+ * Hook for tracking leadership portfolio views
+ */
+export function useTrackLeadershipView() {
+  const { mutate: log } = useLogLeadershipEvent();
+
+  const trackLeadershipAccessed = useCallback(
+    (view: LeadershipAccessedMetadata["view"]) => {
+      log({ eventType: EventType.LEADERSHIP_ACCESSED, metadata: { view } });
+    },
+    [log]
+  );
+
+  return { trackLeadershipAccessed };
 }

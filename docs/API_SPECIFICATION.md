@@ -1,4 +1,4 @@
-# AgentFlow Pitch Hub - API Specification v1.0
+# AgentFlow Pitch Hub - API Specification v1.2
 
 This document defines the complete API contract between the AgentFlow front-end and Stephen's Microsoft 365 middleware. The front-end is fully wired up to call these endpoints — middleware just needs to implement them.
 
@@ -20,6 +20,13 @@ This document defines the complete API contract between the AgentFlow front-end 
    - [Questionnaires](#questionnaire-endpoints)
    - [Members & Access](#member-endpoints)
    - [Activity & Events](#activity-endpoints)
+   - [Leadership (Admin)](#leadership-endpoints)
+   - [Hub Conversion (Phase 2)](#hub-conversion-endpoints)
+   - [Projects (Phase 2)](#project-endpoints)
+   - [Relationship Intelligence (Phase 2)](#relationship-intelligence-endpoints)
+   - [Client Intelligence (Phase 2)](#client-intelligence-endpoints)
+   - [Decision Queue (Phase 2)](#decision-queue-endpoints)
+   - [History & Alerts (Phase 2)](#history-alerts-endpoints)
 5. [Type Definitions](#type-definitions)
 6. [Event Types](#event-types)
 
@@ -1299,12 +1306,759 @@ type VideoVisibility = "client" | "internal";
 
 ### Meeting Status
 ```typescript
-type MeetingStatus = "scheduled" | "completed" | "cancelled";
+type MeetingStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
 ```
 
 ### Invite Status
 ```typescript
 type InviteStatus = "pending" | "accepted" | "expired" | "revoked";
+```
+
+---
+
+## Leadership Endpoints
+
+Admin-only endpoints for portfolio management. All endpoints require staff role with `permissions.isAdmin = true`. Returns `403 Forbidden` for non-admin users.
+
+### Get Portfolio Overview
+```http
+GET /leadership/portfolio
+```
+
+**Response: `PortfolioOverview`**
+```json
+{
+  "totalClients": 24,
+  "atRiskCount": 3,
+  "expansionReadyCount": 8,
+  "avgHealthScore": 76,
+  "dataStaleTimestamp": "2024-01-19T10:00:00Z",
+  "lastCalculatedAt": "2024-01-20T08:00:00Z",
+  "lastRefreshedAt": "2024-01-20T08:00:00Z"
+}
+```
+
+### Get Portfolio Clients
+```http
+GET /leadership/clients
+```
+
+**Query Parameters:**
+- `sortBy`: "health" | "expansion" | "name" | "lastActivity" (default: "health")
+- `order`: "asc" | "desc" (default: "desc")
+
+**Response: `PortfolioClientsResponse`**
+```json
+{
+  "clients": [
+    {
+      "hubId": "hub-client-1",
+      "name": "Whitmore Law LLP",
+      "healthScore": 85,
+      "healthStatus": "strong",
+      "expansionPotential": "high",
+      "lastActivity": "2024-01-20T14:30:00Z"
+    }
+  ],
+  "dataStaleTimestamp": "2024-01-19T10:00:00Z",
+  "lastCalculatedAt": "2024-01-20T08:00:00Z",
+  "lastRefreshedAt": "2024-01-20T08:00:00Z"
+}
+```
+
+### Get At-Risk Clients
+```http
+GET /leadership/at-risk
+```
+
+Returns clients with `healthStatus = "at_risk"`.
+
+**Response: `PortfolioClientsResponse`** (filtered to at-risk only)
+
+### Get Expansion Candidates
+```http
+GET /leadership/expansion
+```
+
+Returns clients with `expansionPotential` of "high" or "medium".
+
+**Response:**
+```json
+{
+  "clients": [...],
+  "opportunities": [
+    {
+      "id": "opp-1",
+      "hubId": "hub-client-1",
+      "type": "upsell",
+      "description": "Client mentioned interest in additional consulting services",
+      "confidence": "high",
+      "estimatedValue": 50000,
+      "detectedAt": "2024-01-15T10:00:00Z",
+      "status": "new"
+    }
+  ],
+  "dataStaleTimestamp": "2024-01-19T10:00:00Z",
+  "lastCalculatedAt": "2024-01-20T08:00:00Z",
+  "lastRefreshedAt": "2024-01-20T08:00:00Z"
+}
+```
+
+### Refresh Portfolio Metrics
+```http
+POST /leadership/refresh
+```
+
+Triggers async recalculation of health scores and expansion opportunities.
+
+**Response:**
+```json
+{
+  "status": "queued",
+  "estimatedCompletionMs": 5000
+}
+```
+
+### Log Leadership Event
+```http
+POST /leadership/events
+```
+
+**Request:**
+```json
+{
+  "eventType": "leadership.accessed",
+  "metadata": {
+    "view": "overview"
+  }
+}
+```
+
+`view` must be one of: "overview" | "all" | "at-risk" | "expansion"
+
+**Response:** `204 No Content`
+
+---
+
+## Hub Conversion Endpoints
+
+Convert a pitch hub to a client hub after winning the deal.
+
+### Convert Hub
+```http
+POST /hubs/{hubId}/convert
+```
+
+Atomically converts a pitch hub to a client hub. This operation is idempotent.
+
+**Request:**
+```json
+{
+  "initialProjectName": "Q1 Implementation"
+}
+```
+
+**Response:**
+```json
+{
+  "hub": { /* Updated Hub object with hubType: "client" */ },
+  "archiveSummary": {
+    "proposalArchived": true,
+    "proposalDocumentId": "doc-archived-1",
+    "questionnaireArchived": true,
+    "questionnaireHistoryId": "history-q-1"
+  },
+  "project": { /* Project if initialProjectName provided */ },
+  "alreadyConverted": false,
+  "audit": {
+    "convertedBy": "user-1",
+    "convertedAt": "2024-01-20T10:00:00Z"
+  }
+}
+```
+
+**Conversion Operations (atomic):**
+1. Archive proposal → Create document with `category: "archived_proposal"`
+2. Archive questionnaire → Create history entry or mark as hidden
+3. Set `hubType = "client"`, `convertedAt`, `convertedBy`
+4. Optionally create first Project
+
+**Idempotency:** If already converted, returns existing state with `alreadyConverted: true`
+
+### Rollback Conversion (Admin Only)
+```http
+POST /hubs/{hubId}/convert/rollback
+```
+
+**INTERNAL USE ONLY** — Early-phase recovery. Requires staff + isAdmin.
+
+Reverses conversion: restore proposal, unarchive questionnaire, set `hubType="pitch"`.
+
+**Response:** Updated Hub object
+
+---
+
+## Project Endpoints
+
+Projects organize work streams within client hubs.
+
+### List Projects
+```http
+GET /hubs/{hubId}/projects
+```
+
+**Query Parameters:**
+- Standard pagination
+- `status`: "active" | "completed" | "on_hold" | "cancelled"
+
+**Response: `PaginatedList<Project>`**
+
+### Create Project
+```http
+POST /hubs/{hubId}/projects
+```
+
+**Request:**
+```json
+{
+  "name": "Q1 Implementation",
+  "description": "Initial rollout phase",
+  "status": "active",
+  "startDate": "2024-01-15",
+  "targetEndDate": "2024-03-31",
+  "lead": "user-1"
+}
+```
+
+**Note:** `lead` is a user ID (EntityId). The response includes `leadName` denormalized for display.
+
+**Response: `Project`**
+```json
+{
+  "id": "project-1",
+  "hubId": "hub-client-1",
+  "name": "Q1 Implementation",
+  "description": "Initial rollout phase",
+  "status": "active",
+  "startDate": "2024-01-15",
+  "targetEndDate": "2024-03-31",
+  "lead": "user-1",
+  "leadName": "Hamish Nicklin",
+  "milestones": [],
+  "createdAt": "2024-01-15T10:00:00Z",
+  "updatedAt": "2024-01-15T10:00:00Z",
+  "createdBy": "user-1"
+}
+```
+
+### Get Project
+```http
+GET /hubs/{hubId}/projects/{projectId}
+```
+
+**Response: `Project`** (includes milestones array)
+
+### Update Project
+```http
+PATCH /hubs/{hubId}/projects/{projectId}
+```
+
+**Request:** Partial Project fields
+
+**Response: `Project`**
+
+### Delete Project
+```http
+DELETE /hubs/{hubId}/projects/{projectId}
+```
+
+Soft delete (marks as cancelled, retained for history).
+
+**Response:** `204 No Content`
+
+### Project-Filtered Artifacts
+
+Existing artifact endpoints accept optional `?projectId=` filter:
+
+```http
+GET /hubs/{hubId}/documents?projectId={projectId}
+GET /hubs/{hubId}/videos?projectId={projectId}
+GET /hubs/{hubId}/messages?projectId={projectId}
+GET /hubs/{hubId}/meetings?projectId={projectId}
+```
+
+**Filter Semantics:**
+- No `projectId` → Returns ALL artifacts
+- `projectId={id}` → Returns artifacts assigned to project
+- `projectId=unassigned` → Returns only unassigned artifacts
+
+**Assign Artifact to Project:**
+```http
+PATCH /hubs/{hubId}/documents/{docId}
+PATCH /hubs/{hubId}/videos/{videoId}
+PATCH /hubs/{hubId}/messages/{threadId}
+PATCH /hubs/{hubId}/meetings/{meetingId}
+```
+
+**Request:** `{ "projectId": "project-1" }` (or `null` to unassign)
+
+---
+
+## Relationship Intelligence Endpoints
+
+AI-powered relationship health scoring and expansion detection.
+
+### Get Relationship Health
+```http
+GET /hubs/{hubId}/relationship-health
+```
+
+**Response:**
+```json
+{
+  "score": 78,
+  "status": "stable",
+  "trend": "improving",
+  "drivers": [
+    {
+      "type": "email_sentiment",
+      "weight": 0.3,
+      "excerpt": "Client expressed enthusiasm about recent deliverables",
+      "timestamp": "2024-01-19T14:00:00Z"
+    }
+  ],
+  "lastCalculatedAt": "2024-01-20T08:00:00Z",
+  "lastRefreshedAt": "2024-01-20T06:00:00Z"
+}
+```
+
+**Status values:** "strong" | "stable" | "at_risk"
+**Trend values:** "improving" | "stable" | "declining"
+
+### Get Expansion Opportunities
+```http
+GET /hubs/{hubId}/expansion-opportunities
+```
+
+**Response:**
+```json
+{
+  "opportunities": [
+    {
+      "id": "opp-1",
+      "title": "Additional consulting services",
+      "evidence": [
+        {
+          "id": "ev-1",
+          "source": "email",
+          "excerpt": "We might need help with the Phase 2 rollout",
+          "redacted": false,
+          "date": "2024-01-18T10:00:00Z"
+        }
+      ],
+      "confidence": "high",
+      "status": "open"
+    }
+  ],
+  "lastCalculatedAt": "2024-01-20T08:00:00Z"
+}
+```
+
+**Confidence values:** "high" | "medium" | "low"
+**Status values:** "open" | "in_progress" | "won" | "lost"
+
+### Update Expansion Opportunity
+```http
+PATCH /hubs/{hubId}/expansion-opportunities/{id}
+```
+
+**Request:**
+```json
+{
+  "status": "in_progress",
+  "notes": "Scheduled discovery call for next week"
+}
+```
+
+**Response:** Updated opportunity with audit fields (`updatedBy`, `updatedAt`)
+
+---
+
+## Client Intelligence Endpoints
+
+AI-powered async endpoints for instant answers, meeting prep, and performance narratives.
+
+### Async Job Pattern
+
+All AI endpoints use a consistent pattern:
+1. **POST** creates a job → returns `{ status: "queued", jobId, pollIntervalHint }`
+2. **GET** polls for result → returns status until "ready" or "error"
+
+**Standard Job Fields:**
+- `expiresAt`: When job will be garbage collected (default: +1 hour)
+- `pollIntervalHint`: Suggested polling interval in ms (default: 2000)
+- `retryAfter`: If rate-limited, seconds to wait
+
+### Instant Answers
+
+#### Create Answer Request
+```http
+POST /hubs/{hubId}/instant-answer/requests
+```
+
+**Request:**
+```json
+{
+  "question": "What was the budget discussed in our last meeting?"
+}
+```
+
+**Response:**
+```json
+{
+  "answerId": "ans-123",
+  "status": "queued",
+  "createdAt": "2024-01-20T10:00:00Z",
+  "expiresAt": "2024-01-20T11:00:00Z",
+  "pollIntervalHint": 2000
+}
+```
+
+#### Get Answer
+```http
+GET /hubs/{hubId}/instant-answer/{answerId}
+```
+
+**Response (ready):**
+```json
+{
+  "id": "ans-123",
+  "status": "ready",
+  "question": "What was the budget discussed?",
+  "answer": "The budget of £50,000 was discussed in the January 15th meeting.",
+  "source": "Meeting transcript from Jan 15",
+  "confidence": "high",
+  "evidence": [
+    {
+      "id": "ev-1",
+      "source": "meeting_transcript",
+      "excerpt": "...agreed on a £50,000 budget for Phase 1...",
+      "redacted": false,
+      "date": "2024-01-15T14:30:00Z"
+    }
+  ],
+  "createdAt": "2024-01-20T10:00:00Z",
+  "completedAt": "2024-01-20T10:00:05Z"
+}
+```
+
+#### Get Recent Answers
+```http
+GET /hubs/{hubId}/instant-answer/latest?limit=10
+```
+
+Returns cached recent answers for the hub.
+
+### Meeting Prep
+
+#### Generate Meeting Prep
+```http
+POST /hubs/{hubId}/meetings/{meetingId}/prep/generate
+```
+
+**Response:** `{ status: "queued" }`
+
+#### Get Meeting Prep
+```http
+GET /hubs/{hubId}/meetings/{meetingId}/prep
+```
+
+**Response:**
+```json
+{
+  "meetingId": "meeting-1",
+  "status": "ready",
+  "summary": "This is a quarterly review with key stakeholders...",
+  "sinceLastMeeting": [
+    "Completed Phase 1 deliverables",
+    "Resolved billing query from Dec 15"
+  ],
+  "decisionsNeeded": [
+    "Approve Phase 2 budget",
+    "Confirm Q2 timeline"
+  ],
+  "generatedAt": "2024-01-20T09:00:00Z"
+}
+```
+
+### Meeting Follow-up
+
+#### Generate Follow-up
+```http
+POST /hubs/{hubId}/meetings/{meetingId}/follow-up/generate
+```
+
+**Response:** `{ status: "queued" }`
+
+#### Get Follow-up
+```http
+GET /hubs/{hubId}/meetings/{meetingId}/follow-up
+```
+
+Same structure as prep, with action items and summary.
+
+### Performance Narratives
+
+#### Generate Narrative
+```http
+POST /hubs/{hubId}/performance/generate
+```
+
+**Request:**
+```json
+{
+  "projectId": "project-1",
+  "period": "Q4 2023"
+}
+```
+
+**Response:**
+```json
+{
+  "narrativeId": "narr-1",
+  "status": "queued"
+}
+```
+
+#### Get Narrative
+```http
+GET /hubs/{hubId}/performance/{narrativeId}
+```
+
+**Response:**
+```json
+{
+  "id": "narr-1",
+  "hubId": "hub-1",
+  "projectId": "project-1",
+  "period": "Q4 2023",
+  "status": "ready",
+  "summaries": [
+    "Successfully delivered all Q4 milestones on schedule",
+    "Client satisfaction score improved from 7.5 to 8.2"
+  ],
+  "recommendations": [
+    "Consider expanding scope to include Phase 2 modules",
+    "Schedule quarterly reviews to maintain engagement"
+  ],
+  "generatedAt": "2024-01-20T10:00:00Z"
+}
+```
+
+#### Get Latest Narrative
+```http
+GET /hubs/{hubId}/performance/latest
+```
+
+Returns most recent cached narrative.
+
+---
+
+## Decision Queue Endpoints
+
+Track items requiring client or stakeholder decisions.
+
+### Decision State Machine
+
+```
+Valid transitions:
+  open → in_review (staff picks up)
+  open → approved (fast-track)
+  open → declined (fast-track)
+  in_review → approved
+  in_review → declined
+  in_review → open (return to queue)
+
+Terminal states: approved, declined
+Invalid transitions return 409 Conflict
+```
+
+### List Decisions
+```http
+GET /hubs/{hubId}/decision-queue
+```
+
+**Query Parameters:**
+- Standard pagination
+- `status`: "open" | "in_review" | "approved" | "declined"
+- `assignee`: User ID
+
+**Response: `{ items: DecisionItem[], total: number }`**
+
+### Create Decision
+```http
+POST /hubs/{hubId}/decision-queue
+```
+
+**Request:**
+```json
+{
+  "title": "Approve Phase 2 budget",
+  "description": "Client needs to approve £75,000 budget for Phase 2",
+  "dueDate": "2024-02-01T00:00:00Z",
+  "assignee": {
+    "id": "user-1",
+    "name": "Sarah Mitchell"
+  },
+  "relatedResource": {
+    "type": "document",
+    "id": "doc-budget-1"
+  }
+}
+```
+
+**Response: `DecisionItem`**
+
+> **Due Date Semantics:** The `dueDate` field accepts ISO 8601 timestamps. When the UI provides a date-only value (from a date picker), it is sent as `YYYY-MM-DDT00:00:00Z` (UTC midnight). The backend should treat this as a date-only boundary and avoid timezone shifts that could cause off-by-one errors in overdue calculations.
+
+### Get Decision
+```http
+GET /hubs/{hubId}/decision-queue/{id}
+```
+
+**Response:** DecisionItem with transition history
+
+### Update Decision (State Transition)
+```http
+PATCH /hubs/{hubId}/decision-queue/{id}
+```
+
+**Request:**
+```json
+{
+  "status": "approved",
+  "reason": "Budget approved by CFO",
+  "comment": "Proceed with Phase 2 kickoff"
+}
+```
+
+**Response:**
+```json
+{
+  "item": { /* Updated DecisionItem */ },
+  "transition": {
+    "id": "trans-1",
+    "decisionId": "decision-1",
+    "fromStatus": "open",
+    "toStatus": "approved",
+    "reason": "Budget approved by CFO",
+    "comment": "Proceed with Phase 2 kickoff",
+    "changedBy": "user-1",
+    "changedByName": "Hamish Nicklin",
+    "changedAt": "2024-01-20T15:00:00Z"
+  }
+}
+```
+
+**Error (invalid transition):** `409 Conflict`
+```json
+{
+  "error": "Invalid transition",
+  "message": "Cannot transition from approved to open",
+  "validTransitions": []
+}
+```
+
+### Get Decision History
+```http
+GET /hubs/{hubId}/decision-queue/{id}/history
+```
+
+**Response:** Array of DecisionTransition objects (audit trail)
+
+---
+
+## History & Alerts Endpoints
+
+Institutional memory and proactive risk monitoring.
+
+### Get History Timeline
+```http
+GET /hubs/{hubId}/history
+```
+
+**Query Parameters:**
+- Standard pagination
+- `type`: "message" | "meeting" | "document" | "decision" | "milestone" | "conversion"
+- `fromDate`: ISO date string
+- `toDate`: ISO date string
+
+**Response: `PaginatedList<HistoryEvent>`**
+```json
+{
+  "items": [
+    {
+      "id": "hist-1",
+      "type": "meeting",
+      "title": "Quarterly Review",
+      "description": "Discussed Q4 results and Q1 planning",
+      "timestamp": "2024-01-15T14:00:00Z",
+      "actor": {
+        "id": "user-1",
+        "name": "Hamish Nicklin"
+      },
+      "resourceLink": "/hub/hub-1/meetings/meeting-1"
+    }
+  ],
+  "pagination": { /* ... */ }
+}
+```
+
+### Get Risk Alerts
+```http
+GET /hubs/{hubId}/risk-alerts
+```
+
+**Response:**
+```json
+{
+  "alerts": [
+    {
+      "id": "alert-1",
+      "type": "declining_engagement",
+      "severity": "medium",
+      "title": "Response times increasing",
+      "description": "Average email response time has increased by 40% over the last 2 weeks",
+      "detectedAt": "2024-01-19T10:00:00Z",
+      "acknowledged": false
+    }
+  ],
+  "acknowledgedCount": 3
+}
+```
+
+### Acknowledge Risk Alert
+```http
+PATCH /hubs/{hubId}/risk-alerts/{id}/acknowledge
+```
+
+**Request:**
+```json
+{
+  "comment": "Reached out to client - they were on holiday"
+}
+```
+
+**Response:**
+```json
+{
+  "alert": { /* Updated RiskAlert with acknowledged: true */ },
+  "audit": {
+    "acknowledgedBy": "user-1",
+    "acknowledgedAt": "2024-01-20T11:00:00Z",
+    "comment": "Reached out to client - they were on holiday"
+  }
+}
 ```
 
 ---
@@ -1329,6 +2083,7 @@ Events use strict enum values for reliable analytics:
 | `questionnaire.completed` | `{ questionnaireId }` |
 | `share.sent` | `{ recipientEmail, resource: { type, id } }` |
 | `share.accepted` | `{ inviteId }` |
+| `leadership.accessed` | `{ view: "overview" \| "all" \| "at-risk" \| "expansion" }` |
 
 ---
 
@@ -1343,6 +2098,7 @@ Events use strict enum values for reliable analytics:
 6. **Documents & Videos** — SharePoint/OneDrive
 7. **Questionnaires** — Forms integration (best-effort analytics)
 8. **Activity** — engagement tracking
+9. **Leadership** — admin portfolio views (Phase 2)
 
 ### Microsoft Graph Mapping
 | Feature | Graph API |
@@ -1362,6 +2118,7 @@ Events use strict enum values for reliable analytics:
 
 ---
 
-*Document version: 1.0*
+*Document version: 1.2*
 *Last updated: 2024-01-20*
-*Front-end version: Phase 4 complete*
+*Front-end version: Phase 7 complete (Routing Updates)*
+*Includes: Phase 2 Client Hubs endpoints (Conversion, Projects, Relationship Intelligence, Client Intelligence, Decision Queue, History & Alerts)*

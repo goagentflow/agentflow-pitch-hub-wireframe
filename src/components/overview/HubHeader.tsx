@@ -18,13 +18,15 @@ const getStatusBadgeClass = (status: string) => {
 };
 
 export function HubHeader({ hub, onSettings }: HubHeaderProps) {
+  const hubTypeLabel = hub.hubType === "client" ? "Client Hub" : "Pitch Hub";
+
   return (
     <div className="flex items-center justify-between mb-6 pb-4 border-b border-[hsl(var(--medium-grey))]/20">
       <div>
         <h1 className="text-4xl font-bold text-[hsl(var(--bold-royal-blue))]">
           {hub.companyName}
         </h1>
-        <p className="text-lg text-[hsl(var(--medium-grey))]">Pitch Hub</p>
+        <p className="text-lg text-[hsl(var(--medium-grey))]">{hubTypeLabel}</p>
       </div>
       <div className="flex items-center gap-3">
         <Badge className={getStatusBadgeClass(hub.status)}>

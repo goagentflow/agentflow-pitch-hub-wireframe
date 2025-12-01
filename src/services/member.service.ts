@@ -220,22 +220,8 @@ export async function getMemberActivity(
     await simulateDelay(300);
 
     const activities: MemberActivity[] = [
-      {
-        memberId: "member-1",
-        memberName: "Sarah Mitchell",
-        action: MemberActivityAction.VIEWED_PROPOSAL,
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        details: "Viewed slides 1-8",
-        resource: { type: "proposal", id: "proposal-1" },
-      },
-      {
-        memberId: "member-1",
-        memberName: "Sarah Mitchell",
-        action: MemberActivityAction.DOWNLOADED_DOCUMENT,
-        timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-        details: "Downloaded Pricing Breakdown",
-        resource: { type: "document", id: "doc-2" },
-      },
+      { memberId: "member-1", memberName: "Sarah Mitchell", action: MemberActivityAction.VIEWED_PROPOSAL, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), details: "Viewed slides 1-8", resource: { type: "proposal", id: "proposal-1" } },
+      { memberId: "member-1", memberName: "Sarah Mitchell", action: MemberActivityAction.DOWNLOADED_DOCUMENT, timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), details: "Downloaded Pricing Breakdown", resource: { type: "document", id: "doc-2" } },
     ];
 
     return {
