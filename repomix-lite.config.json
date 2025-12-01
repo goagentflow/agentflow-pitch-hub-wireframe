@@ -1,0 +1,40 @@
+{
+  "$schema": "https://repomix.com/schemas/latest/schema.json",
+  "output": {
+    "filePath": "repomix-output-lite.xml",
+    "style": "xml",
+    "showLineNumbers": true,
+    "removeEmptyLines": true,
+    "topFilesLength": 10,
+    "includeEmptyDirectories": false,
+    "git": {
+      "sortByChanges": true,
+      "includeDiffs": true
+    }
+  },
+  "include": [
+    "src/**/*.{ts,tsx}",
+    ".cursorrules",
+    "GOLDEN_RULES.md",
+    "package.json",
+    "tailwind.config.ts"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "src/components/ui/**",
+      "src/vite-env.d.ts",
+      "**/index.ts",
+      "src/services/mock-data.ts",
+      "docs/**",
+      "tests/**",
+      "package-lock.json",
+      "bun.lockb",
+      "public/**"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}
