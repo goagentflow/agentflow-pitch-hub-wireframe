@@ -1,0 +1,53 @@
+{
+  "$schema": "https://repomix.com/schemas/latest/schema.json",
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "showLineNumbers": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 10,
+    "includeEmptyDirectories": false,
+    "git": {
+      "sortByChanges": true,
+      "includeDiffs": true
+    }
+  },
+  "include": [
+    "src/**/*.{ts,tsx}",
+    "tests/**/*.ts",
+    "docs/**/*.md",
+    ".cursorrules",
+    "GOLDEN_RULES.md",
+    "README.md",
+    "claude.md",
+    "package.json",
+    "tsconfig.json",
+    "tailwind.config.ts",
+    "vite.config.ts",
+    "playwright.config.ts",
+    "components.json",
+    "index.html"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "src/components/ui/**",
+      "src/vite-env.d.ts",
+      "**/index.ts",
+      "package-lock.json",
+      "bun.lockb",
+      "public/**",
+      "**/*.svg",
+      "**/*.ico",
+      "**/*.lockb",
+      "node_modules/**",
+      "dist/**",
+      ".git/**"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}
